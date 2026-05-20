@@ -122,6 +122,14 @@ def gerar_relatorio():
             # Salvar XML modificado
             doc_xml_path.write_text(xml, encoding="utf-8")
 
+            # Aplicar substituições também no header e footer (que contêm placeholders do cliente)
+            for nome_arq in ["header1.xml", "header2.xml", "footer1.xml", "footer2.xml"]:
+                arq_path = unpacked / "word" / nome_arq
+                if arq_path.exists():
+                    xml_aux = arq_path.read_text(encoding="utf-8")
+                    xml_aux = aplicar_substituicoes(xml_aux, mapa)
+                    arq_path.write_text(xml_aux, encoding="utf-8")
+
             # Copiar fotos (se houver — no MVP geralmente não)
             if imagens_a_processar:
                 copiar_fotos_para_media(unpacked, imagens_a_processar)

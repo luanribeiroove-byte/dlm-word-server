@@ -245,6 +245,25 @@ def atividades_para_narrativa(texto: str) -> str:
 def construir_mapa(dados: dict) -> dict:
     m = {}
 
+    # ===== Dados do cliente =====
+    cliente = dados.get("cliente", {})
+    nome_cliente = cliente.get("razao_social") or cliente.get("nome") or "[A PREENCHER]"
+    m["CLIENTE_NOME"] = nome_cliente
+    m["CLIENTE_NOME_UPPER"] = nome_cliente.upper()
+    m["CLIENTE_NOME_CABECALHO"] = cliente.get("nome_exibicao") or nome_cliente
+    m["CLIENTE_CNPJ"] = cliente.get("cnpj", "[A PREENCHER]")
+    m["CLIENTE_ENDERECO"] = cliente.get("endereco_completo") or cliente.get("endereco") or "[A PREENCHER]"
+    m["TIPO_SISTEMA"] = cliente.get("tipo_sistema") or "ETE com Lodos Ativados e Aeração Prolongada"
+    m["LABORATORIO"] = cliente.get("laboratorio") or "Bioagri Laboratórios Ltda. (Mérieux NutriSciences)"
+
+    # ===== Dados da DLM (fixos) =====
+    empresa = dados.get("empresa", {})
+    m["EMPRESA_NOME"] = empresa.get("nome") or "DLM Saneamento e Engenharia Ltda."
+    m["EMPRESA_NOME_UPPER"] = m["EMPRESA_NOME"].upper()
+    m["EMPRESA_CNPJ"] = empresa.get("cnpj") or "29.745.355/0001-91"
+    m["RT_NOME"] = empresa.get("rt_nome") or "Diego Lopes Marinho"
+
+    # ===== Cabeçalho do relatório =====
     cab = dados.get("cabecalho", {})
     m["PERIODO"] = cab.get("periodo", "[A PREENCHER]")
     m["DATA_EMISSAO"] = cab.get("data_emissao", "[A PREENCHER]")
@@ -459,6 +478,14 @@ def main():
         mapa = construir_mapa(dados)
         xml = aplicar_substituicoes(xml, mapa)
         doc_xml_path.write_text(xml, encoding="utf-8")
+
+        # Aplicar substituições também no header e footer
+        for nome_arq in ["header1.xml", "header2.xml", "footer1.xml", "footer2.xml"]:
+            arq_path = unpacked / "word" / nome_arq
+            if arq_path.exists():
+                xml_aux = arq_path.read_text(encoding="utf-8")
+                xml_aux = aplicar_substituicoes(xml_aux, mapa)
+                arq_path.write_text(xml_aux, encoding="utf-8")
 
         # 5. Copiar fotos novas e adicionar Relationships
         if imagens_a_processar:
