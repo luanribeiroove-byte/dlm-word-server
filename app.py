@@ -29,7 +29,8 @@ from gerar_relatorio import (
     construir_mapa, aplicar_substituicoes,
     ajustar_linhas_nc, ajustar_linhas_quadro,
     reservar_rids_para_fotos, adicionar_relationships_imagens,
-    copiar_fotos_para_media, substituir_area_marcada
+    copiar_fotos_para_media, substituir_area_marcada,
+    decidir_secoes_e_numerar, remover_secoes_ausentes, limpar_marcadores_secao
 )
 from secao4_builder import construir_secao4, construir_sumario_4x
 import zipfile
@@ -102,8 +103,14 @@ def gerar_relatorio():
                 sumario_4x_xml = construir_sumario_4x(inspecoes)
 
             # Substituir áreas marcadas
+            # Substituir áreas marcadas (Seção 4 dinâmica)
             xml = substituir_area_marcada(xml, "__SUMARIO_4X_INICIO__", "__SUMARIO_4X_FIM__", sumario_4x_xml)
             xml = substituir_area_marcada(xml, "__SECAO4_INICIO__", "__SECAO4_FIM__", secao4_xml)
+
+            # ===== Remover seções ausentes e limpar marcadores das presentes =====
+            decisao = decidir_secoes_e_numerar(dados)
+            xml = remover_secoes_ausentes(xml, decisao)
+            xml = limpar_marcadores_secao(xml)
 
             # Ajustes dinâmicos
             num_atividades = len(inspecoes)

@@ -40,6 +40,84 @@ def slugify(s: str) -> str:
     return s.replace("/", "_").replace(" ", "_").lower()
 
 
+def decidir_secoes_e_numerar(dados: dict) -> dict:
+    """
+    Decide quais seções aparecem no relatório e calcula a numeração dinâmica.
+
+    Regras:
+    - INTRODUÇÃO, DADOS, CONSIDERAÇÕES: sempre presentes
+    - QUADRO e DETALHAMENTO: só se houver inspeções
+    - EFICIÊNCIA: só se houve campanha laboratorial
+    - NCS: só se houver não conformidades
+
+    Retorna: { 'presente': {nome: bool}, 'numero': {nome: int|None} }
+    """
+    inspecoes = dados.get("inspecoes", []) or []
+    eficiencia = dados.get("eficiencia", {}) or {}
+    ncs = dados.get("nao_conformidades", []) or []
+
+    presente = {
+        "INTRODUCAO": True,
+        "DADOS": True,
+        "QUADRO": len(inspecoes) > 0,
+        "DETALHAMENTO": len(inspecoes) > 0,
+        "EFICIENCIA": bool(eficiencia.get("houve_campanha")),
+        "NCS": len(ncs) > 0,
+        "CONSIDERACOES": True,
+    }
+
+    # Calcula numeração: só seções presentes recebem número sequencial
+    numero = {}
+    contador = 0
+    for nome in ["INTRODUCAO", "DADOS", "QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS", "CONSIDERACOES"]:
+        if presente[nome]:
+            contador += 1
+            numero[nome] = contador
+        else:
+            numero[nome] = None
+
+    return {"presente": presente, "numero": numero}
+
+
+def remover_secoes_ausentes(xml: str, decisao: dict) -> str:
+    """
+    Remove do XML as áreas marcadas das seções ausentes.
+    Remove tanto a área do corpo (__SECAO_X_INI/FIM__) quanto a linha do sumário (__SUMLINE_X_INI/FIM__).
+    """
+    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS"]:
+        if not decisao["presente"][nome]:
+            xml = substituir_area_marcada(xml, f"__SECAO_{nome}_INI__", f"__SECAO_{nome}_FIM__", "")
+            xml = substituir_area_marcada(xml, f"__SUMLINE_{nome}_INI__", f"__SUMLINE_{nome}_FIM__", "")
+    return xml
+
+
+def limpar_marcadores_secao(xml: str) -> str:
+    """
+    Para seções PRESENTES, os marcadores __SECAO_X_INI/FIM__ e __SUMLINE_X_INI/FIM__ 
+    ficaram no XML. Vamos limpar removendo os parágrafos que contêm esses marcadores.
+    """
+    # Remove parágrafos que contêm apenas marcadores
+    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS"]:
+        for prefixo in ["SECAO", "SUMLINE"]:
+            for sufixo in ["INI", "FIM"]:
+                marker = f"__{prefixo}_{nome}_{sufixo}__"
+                # Procura o parágrafo que contém o marker e remove
+                while True:
+                    pos = xml.find("{{" + marker + "}}")
+                    if pos == -1:
+                        break
+                    # Acha o <w:p> que contém
+                    p_ini = max(xml.rfind("<w:p>", 0, pos), xml.rfind("<w:p ", 0, pos))
+                    p_fim = xml.find("</w:p>", pos)
+                    if p_ini == -1 or p_fim == -1:
+                        # Não achou — substitui só o texto pra não travar
+                        xml = xml.replace("{{" + marker + "}}", "")
+                        break
+                    p_fim += len("</w:p>")
+                    xml = xml[:p_ini] + xml[p_fim:]
+    return xml
+
+
 def aplicar_substituicoes(xml: str, mapa: dict) -> str:
     for placeholder, valor in mapa.items():
         xml = xml.replace("{{" + placeholder + "}}", escape_xml(valor))
@@ -244,6 +322,11 @@ def atividades_para_narrativa(texto: str) -> str:
 
 def construir_mapa(dados: dict) -> dict:
     m = {}
+
+    # ===== Numeração dinâmica das seções =====
+    decisao = decidir_secoes_e_numerar(dados)
+    for nome, num in decisao["numero"].items():
+        m[f"NUM_{nome}"] = str(num) if num is not None else ""
 
     # ===== Dados do cliente =====
     cliente = dados.get("cliente", {})
@@ -462,6 +545,11 @@ def main():
         # 2. Substituir áreas marcadas
         xml = substituir_area_marcada(xml, "__SUMARIO_4X_INICIO__", "__SUMARIO_4X_FIM__", sumario_4x_xml)
         xml = substituir_area_marcada(xml, "__SECAO4_INICIO__", "__SECAO4_FIM__", secao4_xml)
+
+        # 2b. Remover seções ausentes e limpar marcadores das presentes
+        decisao = decidir_secoes_e_numerar(dados)
+        xml = remover_secoes_ausentes(xml, decisao)
+        xml = limpar_marcadores_secao(xml)
 
         # 3a. Ajuste dinâmico da tabela do Quadro Resumo (1 linha por inspeção)
         num_atividades = len(dados.get("inspecoes", []))
