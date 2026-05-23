@@ -40,6 +40,67 @@ def slugify(s: str) -> str:
     return s.replace("/", "_").replace(" ", "_").lower()
 
 
+# ============================================================
+# CONFORMIDADE CONAMA 430/2011
+# ============================================================
+
+def _to_float(v):
+    """Tenta converter um valor (string ou número) pra float. Retorna None se falhar."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        # Remove unidades, %, espaços e troca vírgula por ponto
+        s = v.strip().replace(",", ".").replace("%", "")
+        # Remove tudo que não é número, ponto ou sinal de menos
+        s = re.sub(r"[^0-9.\-]", "", s)
+        if not s or s in (".", "-", "-."):
+            return None
+        try:
+            return float(s)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _conformidade_dbo(p: dict) -> str:
+    """
+    DBO conforme CONAMA 430/2011: tratado ≤ 120 mg/L OU eficiência ≥ 60%.
+    Retorna 'CONFORME', 'NÃO CONFORME' ou '—' se sem dados.
+    """
+    tratado = _to_float(p.get("tratado"))
+    efic = _to_float(p.get("eficiencia"))
+    if tratado is None and efic is None:
+        return "—"
+    # Regra dupla: basta uma satisfazer
+    if tratado is not None and tratado <= 120:
+        return "CONFORME"
+    if efic is not None and efic >= 60:
+        return "CONFORME"
+    return "NÃO CONFORME"
+
+
+def _conformidade_ph(p: dict) -> str:
+    """pH conforme CONAMA 430/2011: 5 ≤ tratado ≤ 9."""
+    tratado = _to_float(p.get("tratado"))
+    if tratado is None:
+        return "—"
+    if 5 <= tratado <= 9:
+        return "CONFORME"
+    return "NÃO CONFORME"
+
+
+def _conformidade_temp(p: dict) -> str:
+    """Temperatura conforme CONAMA 430/2011: tratado < 40°C."""
+    tratado = _to_float(p.get("tratado"))
+    if tratado is None:
+        return "—"
+    if tratado < 40:
+        return "CONFORME"
+    return "NÃO CONFORME"
+
+
 def decidir_secoes_e_numerar(dados: dict) -> dict:
     """
     Decide quais seções aparecem no relatório e calcula a numeração dinâmica.
@@ -392,7 +453,11 @@ def construir_mapa(dados: dict) -> dict:
         m["LAUDO_TRATADO"] = e.get("laudo_tratado", "[A PREENCHER]")
         m["DATA_LAUDOS"] = e.get("data_laudos", "[A PREENCHER]")
 
+        # NOVO: nome do laboratório (genérico, vem da extração da IA)
+        m["LABORATORIO"] = e.get("laboratorio", "[laboratório acreditado]")
+
         params_map = {p["nome"]: p for p in e.get("parametros", [])}
+        nomes_parametros = []  # pra montar a LISTA_PARAMETROS
         for nome_doc, prefixo in [
             ("DBO", "DBO"), ("DQO", "DQO"),
             ("Nitrogênio Total", "NTOTAL"), ("Fósforo Total", "PTOTAL"),
@@ -404,6 +469,33 @@ def construir_mapa(dados: dict) -> dict:
             m[f"{prefixo}_TRATADO"] = p.get("tratado", "—")
             if prefixo not in ("PH", "TEMP"):
                 m[f"{prefixo}_EFIC"] = p.get("eficiencia", "—")
+            # Acumula nomes pra LISTA_PARAMETROS (só se foi analisado)
+            if p:
+                nomes_parametros.append(nome_doc)
+
+        # NOVO: monta lista de parâmetros pra texto introdutório
+        # ex: "DBO, DQO, Nitrogênio Total, Fósforo Total e Coliformes Totais"
+        if nomes_parametros:
+            if len(nomes_parametros) == 1:
+                m["LISTA_PARAMETROS"] = nomes_parametros[0]
+            else:
+                m["LISTA_PARAMETROS"] = ", ".join(nomes_parametros[:-1]) + " e " + nomes_parametros[-1]
+        else:
+            m["LISTA_PARAMETROS"] = "DBO, DQO, Nitrogênio Total, Fósforo Total e Coliformes Totais"
+
+        # NOVO: metodologia SMWW só aparece se a IA capturou (campo opcional)
+        if e.get("metodologia_smww"):
+            m["METODOLOGIA_OPCIONAL"] = ", seguindo as metodologias do Standard Methods for the Examination of Water and Wastewater (SMWW)"
+        else:
+            m["METODOLOGIA_OPCIONAL"] = ""
+
+        # NOVO: calcula conformidade pra cada parâmetro com limite CONAMA 430
+        # DBO: CONFORME se tratado ≤ 120 mg/L OU eficiência ≥ 60%
+        m["DBO_CONFORMIDADE"] = _conformidade_dbo(params_map.get("DBO", {}))
+        # pH: CONFORME se 5 ≤ tratado ≤ 9
+        m["PH_CONFORMIDADE"] = _conformidade_ph(params_map.get("pH", {}))
+        # Temperatura: CONFORME se tratado < 40
+        m["TEMP_CONFORMIDADE"] = _conformidade_temp(params_map.get("Temperatura", {}))
 
         analises = e.get("analise_paragrafos", [])
         m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else "[A PREENCHER]"
@@ -417,11 +509,18 @@ def construir_mapa(dados: dict) -> dict:
         m["LAUDO_BRUTO"] = "—"
         m["LAUDO_TRATADO"] = "—"
         m["DATA_LAUDOS"] = "—"
+        m["LABORATORIO"] = "—"
+        m["LISTA_PARAMETROS"] = "—"
+        m["METODOLOGIA_OPCIONAL"] = ""
         for prefixo in ["DBO", "DQO", "NTOTAL", "PTOTAL", "COLIFORMES", "PH", "TEMP"]:
             m[f"{prefixo}_BRUTO"] = "—"
             m[f"{prefixo}_TRATADO"] = "—"
             if prefixo not in ("PH", "TEMP"):
                 m[f"{prefixo}_EFIC"] = "—"
+        # Conformidades vazias quando não há campanha
+        m["DBO_CONFORMIDADE"] = "—"
+        m["PH_CONFORMIDADE"] = "—"
+        m["TEMP_CONFORMIDADE"] = "—"
         m["ANALISE_EFIC_1"] = "Não foi realizada campanha de monitoramento neste período."
         m["ANALISE_EFIC_2"] = ""
         m["ANALISE_EFIC_3"] = ""
