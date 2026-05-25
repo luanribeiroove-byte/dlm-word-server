@@ -91,14 +91,19 @@ def p_titulo_secao4() -> str:
 
 
 def p_subtitulo(num: str, titulo: str) -> str:
-    """Subtítulo '4.X. Título' em vermelho (Título 2)."""
+    """Subtítulo '4.X. Título' em navy com negrito e tamanho maior."""
     return f'''<w:p>
         <w:pPr>
-          <w:pStyle w:val="Ttulo2"/>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:spacing w:before="240" w:after="120"/>
+          <w:keepNext/>
         </w:pPr>
         <w:r>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:rPr>
+            <w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>
+            <w:b/><w:bCs/>
+            <w:color w:val="0A2540"/>
+            <w:sz w:val="26"/><w:szCs w:val="26"/>
+          </w:rPr>
           <w:t>{escape_xml(num)}. {escape_xml(titulo)}</w:t>
         </w:r>
       </w:p>'''
@@ -107,20 +112,34 @@ def p_subtitulo(num: str, titulo: str) -> str:
 def p_texto(texto: str, negrito_inicio: str = None) -> str:
     """
     Parágrafo de texto justificado. Se negrito_inicio for fornecido (ex.:
-    'Medida corretiva recomendada:'), o início aparece em negrito.
+    'Medida corretiva recomendada:'), gera DOIS parágrafos: um com o título em
+    negrito e outro com o texto abaixo.
     """
-    runs = []
     if negrito_inicio:
-        runs.append(
-            f'<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">{escape_xml(negrito_inicio)} </w:t></w:r>'
-        )
-    runs.append(f'<w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>')
+        # Parágrafo do título (em negrito, sem espaço grande embaixo)
+        titulo_xml = f'''<w:p>
+            <w:pPr>
+              <w:spacing w:before="120" w:after="0" w:line="360" w:lineRule="auto"/>
+              <w:keepNext/>
+            </w:pPr>
+            <w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">{escape_xml(negrito_inicio)}</w:t></w:r>
+          </w:p>'''
+        # Parágrafo do texto (logo abaixo, sem espaço extra em cima)
+        texto_xml = f'''<w:p>
+            <w:pPr>
+              <w:spacing w:before="0" w:after="80" w:line="360" w:lineRule="auto"/>
+              <w:jc w:val="both"/>
+            </w:pPr>
+            <w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>
+          </w:p>'''
+        return titulo_xml + texto_xml
+    # Caso normal: parágrafo único
     return f'''<w:p>
         <w:pPr>
           <w:spacing w:before="80" w:after="80" w:line="360" w:lineRule="auto"/>
           <w:jc w:val="both"/>
         </w:pPr>
-        {"".join(runs)}
+        <w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>
       </w:p>'''
 
 

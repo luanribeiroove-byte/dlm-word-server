@@ -105,6 +105,25 @@ def _conformidade_temp(p: dict) -> str:
 # MODELO DASA — 2 ETEs, 11 parâmetros, regras CONAMA 430 Art. 21
 # ============================================================
 
+def _conformidade_eficiencia(p: dict) -> str:
+    """
+    Mostra a eficiência como texto para parâmetros sem limite direto CONAMA 430.
+    Ex: '99,3% remoção'. Se não conseguir calcular, retorna '—'.
+    """
+    if not p:
+        return "—"
+    efic = p.get("eficiencia", "")
+    if efic and efic != "—":
+        # Garantir que tem "%" no final
+        efic_str = str(efic).strip()
+        if not efic_str.endswith("%"):
+            efic_str = efic_str + "%"
+        return f"{efic_str} remoção"
+    return "—"
+
+
+
+
 def _parse_valor_dasa(s):
     """
     Converte string em (valor_float, tem_menor_que, tem_maior_que).
@@ -391,29 +410,34 @@ def decidir_secoes_e_numerar(dados: dict) -> dict:
     Regras:
     - INTRODUÇÃO, DADOS, CONSIDERAÇÕES: sempre presentes
     - QUADRO e DETALHAMENTO: só se houver inspeções
+    - NCS: só se houver não conformidades (vem ANTES de EFICIENCIA agora — Obs 3)
     - EFICIÊNCIA: só se houve campanha laboratorial
-    - NCS: só se houver não conformidades
+    - ANEXOS: só se houver anexos (por enquanto: sempre False)
 
     Retorna: { 'presente': {nome: bool}, 'numero': {nome: int|None} }
     """
     inspecoes = dados.get("inspecoes", []) or []
     eficiencia = dados.get("eficiencia", {}) or {}
     ncs = dados.get("nao_conformidades", []) or []
+    anexos = dados.get("anexos", []) or []
 
     presente = {
         "INTRODUCAO": True,
         "DADOS": True,
         "QUADRO": len(inspecoes) > 0,
         "DETALHAMENTO": len(inspecoes) > 0,
+        "NCS": len(ncs) > 0,                                    # antes de EFIC
         "EFICIENCIA": bool(eficiencia.get("houve_campanha")),
-        "NCS": len(ncs) > 0,
         "CONSIDERACOES": True,
+        "ANEXOS": len(anexos) > 0,
     }
 
-    # Calcula numeração: só seções presentes recebem número sequencial
+    # Numeração: só seções presentes recebem número sequencial.
+    # Ordem: INTRO, DADOS, QUADRO, DETALHAMENTO, NCS, EFICIENCIA, CONSIDERACOES, ANEXOS
     numero = {}
     contador = 0
-    for nome in ["INTRODUCAO", "DADOS", "QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS", "CONSIDERACOES"]:
+    for nome in ["INTRODUCAO", "DADOS", "QUADRO", "DETALHAMENTO",
+                 "NCS", "EFICIENCIA", "CONSIDERACOES", "ANEXOS"]:
         if presente[nome]:
             contador += 1
             numero[nome] = contador
@@ -428,10 +452,23 @@ def remover_secoes_ausentes(xml: str, decisao: dict) -> str:
     Remove do XML as áreas marcadas das seções ausentes.
     Remove tanto a área do corpo (__SECAO_X_INI/FIM__) quanto a linha do sumário (__SUMLINE_X_INI/FIM__).
     """
-    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS"]:
-        if not decisao["presente"][nome]:
+    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS", "ANEXOS"]:
+        if not decisao["presente"].get(nome, False):
             xml = substituir_area_marcada(xml, f"__SECAO_{nome}_INI__", f"__SECAO_{nome}_FIM__", "")
             xml = substituir_area_marcada(xml, f"__SUMLINE_{nome}_INI__", f"__SUMLINE_{nome}_FIM__", "")
+
+    # OBS 6: SECAO_LAB no parágrafo da Introdução é INLINE (runs dentro de um parágrafo).
+    # Quando não há campanha (EFICIENCIA ausente), remove apenas os runs entre os
+    # marcadores, preservando o restante do parágrafo da Introdução.
+    if not decisao["presente"].get("EFICIENCIA", False):
+        import re as _re
+        # Remove tudo entre {{__SECAO_LAB_INI__}} e {{__SECAO_LAB_FIM__}} (inclusive)
+        pattern = (
+            r'<w:r>(?:(?!<w:r>).)*?\{\{__SECAO_LAB_INI__\}\}.*?'
+            r'\{\{__SECAO_LAB_FIM__\}\}.*?</w:r>'
+        )
+        xml = _re.sub(pattern, '', xml, flags=_re.DOTALL)
+
     return xml
 
 
@@ -439,26 +476,36 @@ def limpar_marcadores_secao(xml: str) -> str:
     """
     Para seções PRESENTES, os marcadores __SECAO_X_INI/FIM__ e __SUMLINE_X_INI/FIM__ 
     ficaram no XML. Vamos limpar removendo os parágrafos que contêm esses marcadores.
+    Trata também marcadores especiais (SECAO_LAB inline e SUMLINE_ANEXOS).
     """
-    # Remove parágrafos que contêm apenas marcadores
-    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS"]:
+    # Marcadores que ficam em PARÁGRAFOS próprios (envolvem áreas)
+    paragrafo_markers = []
+    for nome in ["QUADRO", "DETALHAMENTO", "EFICIENCIA", "NCS", "ANEXOS"]:
         for prefixo in ["SECAO", "SUMLINE"]:
             for sufixo in ["INI", "FIM"]:
-                marker = f"__{prefixo}_{nome}_{sufixo}__"
-                # Procura o parágrafo que contém o marker e remove
-                while True:
-                    pos = xml.find("{{" + marker + "}}")
-                    if pos == -1:
-                        break
-                    # Acha o <w:p> que contém
-                    p_ini = max(xml.rfind("<w:p>", 0, pos), xml.rfind("<w:p ", 0, pos))
-                    p_fim = xml.find("</w:p>", pos)
-                    if p_ini == -1 or p_fim == -1:
-                        # Não achou — substitui só o texto pra não travar
-                        xml = xml.replace("{{" + marker + "}}", "")
-                        break
-                    p_fim += len("</w:p>")
-                    xml = xml[:p_ini] + xml[p_fim:]
+                paragrafo_markers.append(f"__{prefixo}_{nome}_{sufixo}__")
+
+    for marker in paragrafo_markers:
+        while True:
+            pos = xml.find("{{" + marker + "}}")
+            if pos == -1:
+                break
+            p_ini = max(xml.rfind("<w:p>", 0, pos), xml.rfind("<w:p ", 0, pos))
+            p_fim = xml.find("</w:p>", pos)
+            if p_ini == -1 or p_fim == -1:
+                xml = xml.replace("{{" + marker + "}}", "")
+                break
+            p_fim += len("</w:p>")
+            xml = xml[:p_ini] + xml[p_fim:]
+
+    # Marcadores INLINE (SECAO_LAB) — quando presente, remove só o run do marcador
+    # (não remove o parágrafo todo, porque ele tem texto válido em volta)
+    import re
+    for marker in ["__SECAO_LAB_INI__", "__SECAO_LAB_FIM__"]:
+        # Remove o <w:r>...{{marker}}...</w:r> inteiro
+        pattern = r'<w:r>(?:(?!<w:r>).)*?\{\{' + re.escape(marker) + r'\}\}.*?</w:r>'
+        xml = re.sub(pattern, '', xml, flags=re.DOTALL)
+
     return xml
 
 
@@ -697,7 +744,12 @@ def construir_mapa(dados: dict) -> dict:
 
     intro = dados.get("introducao", {})
     m["INTRO_PERIODO"] = intro.get("periodo_intervencoes", "[A PREENCHER]")
-    m["INTRO_MESES_LAB"] = intro.get("meses_analises", "[A PREENCHER]")
+    # INTRO_MESES_LAB: usa o explícito ou cai pro período do cabeçalho/introdução
+    m["INTRO_MESES_LAB"] = (
+        intro.get("meses_analises")
+        or intro.get("periodo_intervencoes")
+        or cab.get("periodo", "—")
+    )
 
     # INTRO_ATIVIDADES: deriva dos títulos das inspeções, mas pode ser
     # sobrescrito por intro.atividades_narrativa se fornecido.
@@ -711,7 +763,10 @@ def construir_mapa(dados: dict) -> dict:
     else:
         m["INTRO_ATIVIDADES"] = "[A PREENCHER]"
 
-    m["PERIODO_ATIVIDADES"] = dados.get("dados", {}).get("periodo_atividades", "[A PREENCHER]")
+    m["PERIODO_ATIVIDADES"] = (
+        dados.get("dados", {}).get("periodo_atividades")
+        or cab.get("periodo", "—")
+    )
 
     # Quadro Resumo (Seção 3): uma linha por inspeção.
     # Cada inspeção pode ter mes_ano e classificacao próprios; se omitidos,
@@ -731,10 +786,10 @@ def construir_mapa(dados: dict) -> dict:
     e = dados.get("eficiencia", {})
     if e.get("houve_campanha"):
         m["EFIC_MES"] = e.get("mes_campanha", "[A PREENCHER]")
-        m["DATA_AMOSTRAGEM"] = e.get("data_amostragem", "[A PREENCHER]")
-        m["LAUDO_BRUTO"] = e.get("laudo_bruto", "[A PREENCHER]")
-        m["LAUDO_TRATADO"] = e.get("laudo_tratado", "[A PREENCHER]")
-        m["DATA_LAUDOS"] = e.get("data_laudos", "[A PREENCHER]")
+        m["DATA_AMOSTRAGEM"] = e.get("data_amostragem", "—")
+        m["LAUDO_BRUTO"] = e.get("laudo_bruto", "—")
+        m["LAUDO_TRATADO"] = e.get("laudo_tratado", "—")
+        m["DATA_LAUDOS"] = e.get("data_laudos", "—")
 
         # NOVO: nome do laboratório (genérico, vem da extração da IA)
         m["LABORATORIO"] = e.get("laboratorio", "[laboratório acreditado]")
@@ -779,9 +834,14 @@ def construir_mapa(dados: dict) -> dict:
         m["PH_CONFORMIDADE"] = _conformidade_ph(params_map.get("pH", {}))
         # Temperatura: CONFORME se tratado < 40
         m["TEMP_CONFORMIDADE"] = _conformidade_temp(params_map.get("Temperatura", {}))
+        # Sem limite direto CONAMA: mostra eficiência (Obs 10)
+        m["DQO_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("DQO", {}))
+        m["NTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Nitrogênio Total", {}))
+        m["PTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Fósforo Total", {}))
+        m["COLIFORMES_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Coliformes Totais", {}))
 
         analises = e.get("analise_paragrafos", [])
-        m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else "[A PREENCHER]"
+        m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else ""
         m["ANALISE_EFIC_2"] = analises[1] if len(analises) > 1 else ""
         m["ANALISE_EFIC_3"] = analises[2] if len(analises) > 2 else ""
         # Placeholder de limpeza (texto fixo do template que não usamos mais)
@@ -804,6 +864,10 @@ def construir_mapa(dados: dict) -> dict:
         m["DBO_CONFORMIDADE"] = "—"
         m["PH_CONFORMIDADE"] = "—"
         m["TEMP_CONFORMIDADE"] = "—"
+        m["DQO_CONFORMIDADE"] = "—"
+        m["NTOTAL_CONFORMIDADE"] = "—"
+        m["PTOTAL_CONFORMIDADE"] = "—"
+        m["COLIFORMES_CONFORMIDADE"] = "—"
         m["ANALISE_EFIC_1"] = "Não foi realizada campanha de monitoramento neste período."
         m["ANALISE_EFIC_2"] = ""
         m["ANALISE_EFIC_3"] = ""
@@ -829,6 +893,87 @@ def construir_mapa(dados: dict) -> dict:
 # ============================================================
 # SUBSTITUIÇÃO DAS ÁREAS DINÂMICAS
 # ============================================================
+
+# ============================================================
+# COLORAÇÃO CONDICIONAL DE CÉLULAS (Prioridade + Conformidade)
+# ============================================================
+
+# Mapa: cor única no template → (placeholder lógico, função pra calcular cor real)
+# Servidor substitui essas cores únicas pelas cores reais conforme o valor
+
+CORES_PLACEHOLDER = {
+    # Prioridade NCs
+    "AAA001": "NC1_PRIORIDADE",
+    "AAA002": "NC2_PRIORIDADE",
+    "AAA003": "NC3_PRIORIDADE",
+    # Conformidade Eficiência
+    "AAA101": "DBO_CONFORMIDADE",
+    "AAA102": "DQO_CONFORMIDADE",
+    "AAA103": "NTOTAL_CONFORMIDADE",
+    "AAA104": "PTOTAL_CONFORMIDADE",
+    "AAA105": "COLIFORMES_CONFORMIDADE",
+    "AAA106": "PH_CONFORMIDADE",
+    "AAA107": "TEMP_CONFORMIDADE",
+}
+
+# Cores reais (hex sem #)
+COR_VERMELHO = "F8D7DA"   # vermelho claro pra fundo (Urgente, Não Conforme)
+COR_AMARELO  = "FFF3CD"   # amarelo claro (Alta prioridade)
+COR_VERDE    = "D4EDDA"   # verde claro (Conforme)
+COR_NEUTRA   = "FFFFFF"   # branco (sem destaque)
+
+
+def _cor_prioridade(valor: str) -> str:
+    """Retorna a cor hex baseada na prioridade da NC."""
+    v = (valor or "").strip().lower()
+    if v == "urgente":
+        return COR_VERMELHO
+    if v == "alta":
+        return COR_AMARELO
+    return COR_NEUTRA
+
+
+def _cor_conformidade(valor: str) -> str:
+    """Retorna a cor hex baseada no texto de conformidade.
+    
+    - 'CONFORME' (com ou sem %) → verde
+    - 'NÃO CONFORME' → vermelho
+    - qualquer outro (descritivo: '99% remoção', '—', etc) → sem cor
+    """
+    if not valor:
+        return COR_NEUTRA
+    v = valor.strip().lower()
+    # "não conforme" tem que ser checado ANTES de "conforme"
+    if "não conforme" in v or "nao conforme" in v:
+        return COR_VERMELHO
+    if "conforme" in v:
+        return COR_VERDE
+    return COR_NEUTRA
+
+
+def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
+    """
+    Substitui as cores únicas (AAA001, AAA002, ...) pelas cores reais 
+    calculadas a partir dos valores em `mapa`.
+    
+    Deve ser chamado APÓS aplicar_substituicoes (que troca placeholders 
+    de texto) — assim sabemos os valores finais de prioridade/conformidade.
+    """
+    for cor_unica, placeholder_logico in CORES_PLACEHOLDER.items():
+        valor = mapa.get(placeholder_logico, "")
+        if "PRIORIDADE" in placeholder_logico:
+            cor_real = _cor_prioridade(valor)
+        else:  # CONFORMIDADE
+            cor_real = _cor_conformidade(valor)
+        # Substituir a cor única pela cor real no shd
+        xml = xml.replace(
+            f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_unica}"/>',
+            f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_real}"/>'
+        )
+    return xml
+
+
+
 
 def substituir_area_marcada(xml: str, token_inicio: str, token_fim: str, novo_conteudo: str) -> str:
     """
