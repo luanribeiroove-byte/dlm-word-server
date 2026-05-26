@@ -102,7 +102,7 @@ def p_titulo_secao4() -> str:
 
 
 def p_subtitulo(num: str, titulo: str) -> str:
-    """Subtítulo '4.X. Título' em Verdana negrito 13pt navy."""
+    """Subtítulo '4.X. Título' em Verdana negrito 12pt navy."""
     return f'''<w:p>
         <w:pPr>
           <w:spacing w:before="280" w:after="120" w:line="360" w:lineRule="auto"/>
@@ -114,8 +114,8 @@ def p_subtitulo(num: str, titulo: str) -> str:
             <w:b/>
             <w:bCs/>
             <w:color w:val="0A2540"/>
-            <w:sz w:val="26"/>
-            <w:szCs w:val="26"/>
+            <w:sz w:val="24"/>
+            <w:szCs w:val="24"/>
           </w:rPr>
           <w:t>{escape_xml(num)}. {escape_xml(titulo)}</w:t>
         </w:r>
@@ -130,7 +130,7 @@ def p_texto(texto: str, negrito_inicio: str = None) -> str:
     """
     fonte_rpr = (
         '<w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>'
-        '<w:sz w:val="24"/><w:szCs w:val="24"/>'
+        '<w:sz w:val="22"/><w:szCs w:val="22"/>'
     )
     runs = []
     if negrito_inicio:
@@ -467,10 +467,10 @@ def construir_sumario_4x(inspecoes: List[Dict[str, Any]]) -> str:
             '</w:pPr>'
             '<w:r>'
             '<w:rPr>'
-            '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
+            '<w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>'
             '<w:color w:val="000000"/>'
-            '<w:sz w:val="22"/>'
-            '<w:szCs w:val="22"/>'
+            '<w:sz w:val="24"/>'
+            '<w:szCs w:val="24"/>'
             '</w:rPr>'
             f'<w:t xml:space="preserve">4.{i}.\t{titulo}</w:t>'
             '</w:r>'
