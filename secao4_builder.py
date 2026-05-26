@@ -77,28 +77,46 @@ def ler_dimensoes_px(caminho: Path) -> tuple:
 # ============================================================
 
 def p_titulo_secao4() -> str:
-    """Parágrafo do título '4. DETALHAMENTO DAS ATIVIDADES' em vermelho."""
+    """Parágrafo do título '4. DETALHAMENTO DAS ATIVIDADES' (Verdana 16pt navy negrito).
+
+    NÃO é chamado por construir_secao4() — o título já vem do template.
+    Mantido apenas por compatibilidade.
+    """
     return '''<w:p>
         <w:pPr>
-          <w:pStyle w:val="Ttulo1"/>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:spacing w:before="360" w:after="180" w:line="360" w:lineRule="auto"/>
+          <w:jc w:val="left"/>
         </w:pPr>
         <w:r>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:rPr>
+            <w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="0A2540"/>
+            <w:sz w:val="32"/>
+            <w:szCs w:val="32"/>
+          </w:rPr>
           <w:t>4. DETALHAMENTO DAS ATIVIDADES</w:t>
         </w:r>
       </w:p>'''
 
 
 def p_subtitulo(num: str, titulo: str) -> str:
-    """Subtítulo '4.X. Título' em vermelho (Título 2)."""
+    """Subtítulo '4.X. Título' em Verdana negrito 13pt navy."""
     return f'''<w:p>
         <w:pPr>
-          <w:pStyle w:val="Ttulo2"/>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:spacing w:before="280" w:after="120" w:line="360" w:lineRule="auto"/>
+          <w:jc w:val="left"/>
         </w:pPr>
         <w:r>
-          <w:rPr><w:color w:val="000000"/></w:rPr>
+          <w:rPr>
+            <w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>
+            <w:b/>
+            <w:bCs/>
+            <w:color w:val="0A2540"/>
+            <w:sz w:val="26"/>
+            <w:szCs w:val="26"/>
+          </w:rPr>
           <w:t>{escape_xml(num)}. {escape_xml(titulo)}</w:t>
         </w:r>
       </w:p>'''
@@ -106,18 +124,28 @@ def p_subtitulo(num: str, titulo: str) -> str:
 
 def p_texto(texto: str, negrito_inicio: str = None) -> str:
     """
-    Parágrafo de texto justificado. Se negrito_inicio for fornecido (ex.:
-    'Medida corretiva recomendada:'), o início aparece em negrito.
+    Parágrafo de texto justificado em padrão ABNT (Verdana 12pt, 1,5 entrelinhas,
+    recuo de 1,25 cm na primeira linha). Se negrito_inicio for fornecido
+    (ex.: 'Medida corretiva recomendada:'), o início aparece em negrito.
     """
+    fonte_rpr = (
+        '<w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>'
+        '<w:sz w:val="24"/><w:szCs w:val="24"/>'
+    )
     runs = []
     if negrito_inicio:
         runs.append(
-            f'<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">{escape_xml(negrito_inicio)} </w:t></w:r>'
+            f'<w:r><w:rPr>{fonte_rpr}<w:b/><w:bCs/></w:rPr>'
+            f'<w:t xml:space="preserve">{escape_xml(negrito_inicio)} </w:t></w:r>'
         )
-    runs.append(f'<w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>')
+    runs.append(
+        f'<w:r><w:rPr>{fonte_rpr}</w:rPr>'
+        f'<w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>'
+    )
     return f'''<w:p>
         <w:pPr>
-          <w:spacing w:before="80" w:after="80" w:line="360" w:lineRule="auto"/>
+          <w:spacing w:before="0" w:after="120" w:line="360" w:lineRule="auto"/>
+          <w:ind w:firstLine="708"/>
           <w:jc w:val="both"/>
         </w:pPr>
         {"".join(runs)}
@@ -125,17 +153,18 @@ def p_texto(texto: str, negrito_inicio: str = None) -> str:
 
 
 def p_legenda(texto: str) -> str:
-    """Legenda da figura, centralizada e em itálico cinza."""
+    """Legenda da figura, centralizada e em itálico cinza (Verdana 10pt)."""
     return f'''<w:p>
         <w:pPr>
-          <w:spacing w:before="0" w:after="240"/>
+          <w:spacing w:before="0" w:after="240" w:line="276" w:lineRule="auto"/>
           <w:jc w:val="center"/>
         </w:pPr>
         <w:r>
           <w:rPr>
+            <w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>
             <w:i/><w:iCs/>
             <w:color w:val="666666"/>
-            <w:sz w:val="18"/><w:szCs w:val="18"/>
+            <w:sz w:val="20"/><w:szCs w:val="20"/>
           </w:rPr>
           <w:t>{escape_xml(texto)}</w:t>
         </w:r>
@@ -215,7 +244,12 @@ def tabela_imagens_lado_a_lado(imagens: list) -> str:
                 <w:p>
                   <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="240"/></w:pPr>
                   <w:r>
-                    <w:rPr><w:i/><w:iCs/><w:color w:val="666666"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+                    <w:rPr>
+                      <w:rFonts w:ascii="Verdana" w:cs="Verdana" w:eastAsia="Verdana" w:hAnsi="Verdana"/>
+                      <w:i/><w:iCs/>
+                      <w:color w:val="666666"/>
+                      <w:sz w:val="20"/><w:szCs w:val="20"/>
+                    </w:rPr>
                     <w:t>{escape_xml(img["legenda"])}</w:t>
                   </w:r>
                 </w:p>
