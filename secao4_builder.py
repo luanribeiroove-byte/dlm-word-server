@@ -91,19 +91,14 @@ def p_titulo_secao4() -> str:
 
 
 def p_subtitulo(num: str, titulo: str) -> str:
-    """Subtítulo '4.X. Título' em navy com negrito e tamanho maior."""
+    """Subtítulo '4.X. Título' em vermelho (Título 2)."""
     return f'''<w:p>
         <w:pPr>
-          <w:spacing w:before="240" w:after="120"/>
-          <w:keepNext/>
+          <w:pStyle w:val="Ttulo2"/>
+          <w:rPr><w:color w:val="000000"/></w:rPr>
         </w:pPr>
         <w:r>
-          <w:rPr>
-            <w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>
-            <w:b/><w:bCs/>
-            <w:color w:val="0A2540"/>
-            <w:sz w:val="26"/><w:szCs w:val="26"/>
-          </w:rPr>
+          <w:rPr><w:color w:val="000000"/></w:rPr>
           <w:t>{escape_xml(num)}. {escape_xml(titulo)}</w:t>
         </w:r>
       </w:p>'''
@@ -112,34 +107,20 @@ def p_subtitulo(num: str, titulo: str) -> str:
 def p_texto(texto: str, negrito_inicio: str = None) -> str:
     """
     Parágrafo de texto justificado. Se negrito_inicio for fornecido (ex.:
-    'Medida corretiva recomendada:'), gera DOIS parágrafos: um com o título em
-    negrito e outro com o texto abaixo.
+    'Medida corretiva recomendada:'), o início aparece em negrito.
     """
+    runs = []
     if negrito_inicio:
-        # Parágrafo do título (em negrito, sem espaço grande embaixo)
-        titulo_xml = f'''<w:p>
-            <w:pPr>
-              <w:spacing w:before="120" w:after="0" w:line="360" w:lineRule="auto"/>
-              <w:keepNext/>
-            </w:pPr>
-            <w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">{escape_xml(negrito_inicio)}</w:t></w:r>
-          </w:p>'''
-        # Parágrafo do texto (logo abaixo, sem espaço extra em cima)
-        texto_xml = f'''<w:p>
-            <w:pPr>
-              <w:spacing w:before="0" w:after="80" w:line="360" w:lineRule="auto"/>
-              <w:jc w:val="both"/>
-            </w:pPr>
-            <w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>
-          </w:p>'''
-        return titulo_xml + texto_xml
-    # Caso normal: parágrafo único
+        runs.append(
+            f'<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">{escape_xml(negrito_inicio)} </w:t></w:r>'
+        )
+    runs.append(f'<w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>')
     return f'''<w:p>
         <w:pPr>
           <w:spacing w:before="80" w:after="80" w:line="360" w:lineRule="auto"/>
           <w:jc w:val="both"/>
         </w:pPr>
-        <w:r><w:t xml:space="preserve">{escape_xml(texto)}</w:t></w:r>
+        {"".join(runs)}
       </w:p>'''
 
 
@@ -407,19 +388,58 @@ def construir_secao4(
 
 
 def construir_sumario_4x(inspecoes: List[Dict[str, Any]]) -> str:
-    """Gera os parágrafos do sumário para as subseções 4.x."""
+    """Gera os parágrafos do sumário para as subseções 4.x.
+
+    Estilo: recuo à esquerda, número 4.X em coluna, título do subitem em
+    Title Case PT-BR (sem negrito), pontilhados até a margem direita.
+    Sem número de página por enquanto.
+    """
+    # Palavras curtas que devem ficar minúsculas em pt-BR (exceto se forem
+    # a primeira palavra do título)
+    MINUSCULAS = {
+        "a", "as", "à", "às", "ao", "aos", "o", "os", "um", "uma", "uns", "umas",
+        "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+        "por", "para", "pela", "pelo", "pelas", "pelos",
+        "com", "sem", "sob", "sobre", "entre", "ante", "após",
+        "e", "ou", "mas", "que", "se",
+    }
+
+    def title_case_ptbr(texto: str) -> str:
+        palavras = texto.strip().split()
+        resultado = []
+        for i, p in enumerate(palavras):
+            p_lower = p.lower()
+            if i == 0 or p_lower not in MINUSCULAS:
+                # Primeira palavra ou palavra "longa": capitalizar
+                resultado.append(p_lower.capitalize())
+            else:
+                resultado.append(p_lower)
+        return " ".join(resultado)
+
     blocos = []
     for i, insp in enumerate(inspecoes, start=1):
-        titulo = escape_xml(insp.get("titulo", f"Inspeção {i}"))
-        blocos.append(f'''<w:p>
-        <w:pPr>
-          <w:pStyle w:val="Sumrio2"/>
-          <w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9016"/></w:tabs>
-          <w:rPr>
-            <w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia" w:hAnsiTheme="minorHAnsi" w:cstheme="minorBidi"/>
-            <w:noProof/>
-          </w:rPr>
-        </w:pPr>
-        <w:r><w:rPr><w:noProof/></w:rPr><w:t>4.{i}. {titulo}</w:t></w:r>
-      </w:p>''')
+        titulo_raw = insp.get("titulo", f"Inspeção {i}")
+        titulo_tc = title_case_ptbr(titulo_raw) if titulo_raw else f"Inspeção {i}"
+        titulo = escape_xml(titulo_tc)
+        blocos.append(
+            '<w:p>'
+            '<w:pPr>'
+            '<w:tabs>'
+            '<w:tab w:val="left" w:pos="2160"/>'
+            '<w:tab w:val="right" w:pos="9360" w:leader="dot"/>'
+            '</w:tabs>'
+            '<w:spacing w:after="120" w:before="120"/>'
+            '<w:ind w:left="1440"/>'
+            '</w:pPr>'
+            '<w:r>'
+            '<w:rPr>'
+            '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
+            '<w:color w:val="000000"/>'
+            '<w:sz w:val="22"/>'
+            '<w:szCs w:val="22"/>'
+            '</w:rPr>'
+            f'<w:t xml:space="preserve">4.{i}.\t{titulo}</w:t>'
+            '</w:r>'
+            '</w:p>'
+        )
     return "".join(blocos)
