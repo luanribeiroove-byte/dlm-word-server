@@ -412,14 +412,20 @@ def decidir_secoes_e_numerar(dados: dict) -> dict:
     - QUADRO e DETALHAMENTO: só se houver inspeções
     - NCS: só se houver não conformidades (vem ANTES de EFICIENCIA agora — Obs 3)
     - EFICIÊNCIA: só se houve campanha laboratorial
-    - ANEXOS: só se houver anexos (por enquanto: sempre False)
+    - ANEXOS: só se houver campanha laboratorial com pelo menos um laudo informado
+              (os anexos são os boletins/laudos do laboratório)
 
     Retorna: { 'presente': {nome: bool}, 'numero': {nome: int|None} }
     """
     inspecoes = dados.get("inspecoes", []) or []
     eficiencia = dados.get("eficiencia", {}) or {}
     ncs = dados.get("nao_conformidades", []) or []
-    anexos = dados.get("anexos", []) or []
+
+    # ANEXOS = laudos da campanha. Se há campanha com laudo bruto OU tratado, há anexo.
+    houve_campanha = bool(eficiencia.get("houve_campanha"))
+    laudo_bruto = (eficiencia.get("laudo_bruto") or "").strip()
+    laudo_tratado = (eficiencia.get("laudo_tratado") or "").strip()
+    tem_anexos = houve_campanha and (bool(laudo_bruto) or bool(laudo_tratado))
 
     presente = {
         "INTRODUCAO": True,
@@ -427,9 +433,9 @@ def decidir_secoes_e_numerar(dados: dict) -> dict:
         "QUADRO": len(inspecoes) > 0,
         "DETALHAMENTO": len(inspecoes) > 0,
         "NCS": len(ncs) > 0,                                    # antes de EFIC
-        "EFICIENCIA": bool(eficiencia.get("houve_campanha")),
+        "EFICIENCIA": houve_campanha,
         "CONSIDERACOES": True,
-        "ANEXOS": len(anexos) > 0,
+        "ANEXOS": tem_anexos,
     }
 
     # Numeração: só seções presentes recebem número sequencial.
@@ -881,6 +887,17 @@ def construir_mapa(dados: dict) -> dict:
         m[f"NC{i}_MEDIDA"] = nc.get("medida", "—")
         m[f"NC{i}_PRIORIDADE"] = nc.get("prioridade", "—")
         m[f"NC{i}_STATUS"] = nc.get("status", "—")
+
+    # ===== Anexos (Seção 8) =====
+    # Os anexos são os boletins de análise da campanha laboratorial.
+    # Usamos dois placeholders separados (cada um num parágrafo próprio do template)
+    # pra evitar problemas com quebra de linha dentro de uma string única.
+    # A seção inteira é controlada pelos marcadores __SECAO_ANEXOS_INI/FIM__
+    # (decidir_secoes_e_numerar decide se aparece).
+    laudo_b = (e.get("laudo_bruto") or "").strip() if e.get("houve_campanha") else ""
+    laudo_t = (e.get("laudo_tratado") or "").strip() if e.get("houve_campanha") else ""
+    m["ANEXO_1"] = f"• Boletim de Análise nº {laudo_b} — Efluente Bruto" if laudo_b else ""
+    m["ANEXO_2"] = f"• Boletim de Análise nº {laudo_t} — Efluente Tratado" if laudo_t else ""
 
     # Considerações finais (7 parágrafos)
     paragrafos = dados.get("consideracoes_paragrafos", [])
