@@ -734,7 +734,7 @@ def construir_mapa(dados: dict) -> dict:
     m["CLIENTE_CNPJ"] = cliente.get("cnpj", "[A PREENCHER]")
     m["CLIENTE_ENDERECO"] = cliente.get("endereco_completo") or cliente.get("endereco") or "[A PREENCHER]"
     m["TIPO_SISTEMA"] = cliente.get("tipo_sistema") or "ETE com Lodos Ativados e Aeração Prolongada"
-    m["LABORATORIO"] = cliente.get("laboratorio") or "Bioagri Laboratórios Ltda. (Mérieux NutriSciences)"
+    # LABORATORIO é definido mais abaixo, dependendo de haver ou não campanha laboratorial
 
     # ===== Dados da DLM (fixos) =====
     empresa = dados.get("empresa", {})
@@ -797,8 +797,13 @@ def construir_mapa(dados: dict) -> dict:
         m["LAUDO_TRATADO"] = e.get("laudo_tratado", "—")
         m["DATA_LAUDOS"] = e.get("data_laudos", "—")
 
-        # NOVO: nome do laboratório (genérico, vem da extração da IA)
-        m["LABORATORIO"] = e.get("laboratorio", "[laboratório acreditado]")
+        # Nome do laboratório: prioridade
+        #   1. O que a IA extraiu do PDF do laudo (e.get("laboratorio"))
+        #   2. O cadastrado no cliente (cliente.get("laboratorio"))
+        #   3. Fallback "[laboratório acreditado]" — sinaliza que precisa preencher manual
+        lab_ia = (e.get("laboratorio") or "").strip()
+        lab_cliente = (cliente.get("laboratorio") or "").strip()
+        m["LABORATORIO"] = lab_ia or lab_cliente or "[laboratório acreditado]"
 
         params_map = {p["nome"]: p for p in e.get("parametros", [])}
         nomes_parametros = []  # pra montar a LISTA_PARAMETROS
