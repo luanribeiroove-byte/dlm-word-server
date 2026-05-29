@@ -572,6 +572,42 @@ def ajustar_linhas_nc(xml: str, num_ncs: int) -> str:
 # AJUSTE DINÂMICO DA TABELA DO QUADRO RESUMO
 # ============================================================
 
+def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
+    """
+    Remove da tabela de eficiência as linhas de parâmetros sem valor.
+    Regra (Opção A): a linha some apenas quando Bruto E Tratado estão vazios
+    (em branco ou "—"). Deve rodar ANTES de aplicar_substituicoes, enquanto
+    os placeholders {{XXX_BRUTO}} ainda existem como âncora.
+    """
+    def vazio(v):
+        return v is None or str(v).strip() in ("", "—", "-")
+
+    # prefixo do placeholder de cada parâmetro da tabela
+    prefixos = ["DBO", "DQO", "NTOTAL", "PTOTAL", "COLIFORMES", "PH", "TEMP"]
+
+    for prefixo in prefixos:
+        bruto = mapa.get(f"{prefixo}_BRUTO")
+        tratado = mapa.get(f"{prefixo}_TRATADO")
+        if not (vazio(bruto) and vazio(tratado)):
+            continue  # tem ao menos um valor → mantém a linha
+
+        # acha a linha <w:tr> que contém o placeholder _BRUTO desse parâmetro
+        marcador = "{{" + prefixo + "_BRUTO}}"
+        pos = xml.find(marcador)
+        if pos == -1:
+            continue
+        inicio = xml.rfind("<w:tr ", 0, pos)
+        if inicio == -1:
+            inicio = xml.rfind("<w:tr>", 0, pos)
+        fim = xml.find("</w:tr>", pos)
+        if inicio == -1 or fim == -1:
+            continue
+        fim += len("</w:tr>")
+        xml = xml[:inicio] + xml[fim:]
+
+    return xml
+
+
 def ajustar_linhas_quadro(xml: str, num_atividades: int) -> str:
     """
     Adiciona/remove linhas da tabela do Quadro Resumo conforme num_atividades.
@@ -734,7 +770,7 @@ def construir_mapa(dados: dict) -> dict:
     m["CLIENTE_CNPJ"] = cliente.get("cnpj", "[A PREENCHER]")
     m["CLIENTE_ENDERECO"] = cliente.get("endereco_completo") or cliente.get("endereco") or "[A PREENCHER]"
     m["TIPO_SISTEMA"] = cliente.get("tipo_sistema") or "ETE com Lodos Ativados e Aeração Prolongada"
-    # LABORATORIO é definido mais abaixo, dependendo de haver ou não campanha laboratorial
+    m["LABORATORIO"] = cliente.get("laboratorio") or "Bioagri Laboratórios Ltda. (Mérieux NutriSciences)"
 
     # ===== Dados da DLM (fixos) =====
     empresa = dados.get("empresa", {})
@@ -797,30 +833,40 @@ def construir_mapa(dados: dict) -> dict:
         m["LAUDO_TRATADO"] = e.get("laudo_tratado", "—")
         m["DATA_LAUDOS"] = e.get("data_laudos", "—")
 
-        # Nome do laboratório: prioridade
-        #   1. O que a IA extraiu do PDF do laudo (e.get("laboratorio"))
-        #   2. O cadastrado no cliente (cliente.get("laboratorio"))
-        #   3. Fallback "[laboratório acreditado]" — sinaliza que precisa preencher manual
-        lab_ia = (e.get("laboratorio") or "").strip()
-        lab_cliente = (cliente.get("laboratorio") or "").strip()
-        m["LABORATORIO"] = lab_ia or lab_cliente or "[laboratório acreditado]"
+        # NOVO: nome do laboratório (genérico, vem da extração da IA)
+        m["LABORATORIO"] = e.get("laboratorio", "[laboratório acreditado]")
 
         params_map = {p["nome"]: p for p in e.get("parametros", [])}
+
+        # Coliformes: aceita "Totais" OU "Termotolerantes" na mesma linha.
+        # Rótulo da linha (COLIFORMES_LABEL) reflete o que veio do laudo.
+        colif_termo = params_map.get("Coliformes Termotolerantes")
+        colif_totais = params_map.get("Coliformes Totais")
+        colif = colif_termo or colif_totais or {}
+        if colif_termo:
+            m["COLIFORMES_LABEL"] = "Coliformes Termotolerantes"
+        elif colif_totais:
+            m["COLIFORMES_LABEL"] = "Coliformes Totais"
+        else:
+            m["COLIFORMES_LABEL"] = "Coliformes Totais"  # padrão quando não há dado
+
         nomes_parametros = []  # pra montar a LISTA_PARAMETROS
         for nome_doc, prefixo in [
             ("DBO", "DBO"), ("DQO", "DQO"),
             ("Nitrogênio Total", "NTOTAL"), ("Fósforo Total", "PTOTAL"),
-            ("Coliformes Totais", "COLIFORMES"),
+            ("__COLIF__", "COLIFORMES"),
             ("pH", "PH"), ("Temperatura", "TEMP"),
         ]:
-            p = params_map.get(nome_doc, {})
+            # Coliformes usa o dict resolvido acima (Totais ou Termotolerantes)
+            p = colif if nome_doc == "__COLIF__" else params_map.get(nome_doc, {})
             m[f"{prefixo}_BRUTO"] = p.get("bruto", "—")
             m[f"{prefixo}_TRATADO"] = p.get("tratado", "—")
             if prefixo not in ("PH", "TEMP"):
                 m[f"{prefixo}_EFIC"] = p.get("eficiencia", "—")
             # Acumula nomes pra LISTA_PARAMETROS (só se foi analisado)
             if p:
-                nomes_parametros.append(nome_doc)
+                rotulo = m["COLIFORMES_LABEL"] if nome_doc == "__COLIF__" else nome_doc
+                nomes_parametros.append(rotulo)
 
         # NOVO: monta lista de parâmetros pra texto introdutório
         # ex: "DBO, DQO, Nitrogênio Total, Fósforo Total e Coliformes Totais"
@@ -849,7 +895,7 @@ def construir_mapa(dados: dict) -> dict:
         m["DQO_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("DQO", {}))
         m["NTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Nitrogênio Total", {}))
         m["PTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Fósforo Total", {}))
-        m["COLIFORMES_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Coliformes Totais", {}))
+        m["COLIFORMES_CONFORMIDADE"] = _conformidade_eficiencia(colif)
 
         analises = e.get("analise_paragrafos", [])
         m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else ""
@@ -879,6 +925,7 @@ def construir_mapa(dados: dict) -> dict:
         m["NTOTAL_CONFORMIDADE"] = "—"
         m["PTOTAL_CONFORMIDADE"] = "—"
         m["COLIFORMES_CONFORMIDADE"] = "—"
+        m["COLIFORMES_LABEL"] = "Coliformes Totais"
         m["ANALISE_EFIC_1"] = "Não foi realizada campanha de monitoramento neste período."
         m["ANALISE_EFIC_2"] = ""
         m["ANALISE_EFIC_3"] = ""
@@ -1113,6 +1160,8 @@ def main():
 
         # 4. Substituir placeholders simples
         mapa = construir_mapa(dados)
+        # 4b. Remover linhas de parâmetros sem valor (Bruto e Tratado vazios)
+        xml = remover_linhas_parametros_vazios(xml, mapa)
         xml = aplicar_substituicoes(xml, mapa)
         doc_xml_path.write_text(xml, encoding="utf-8")
 
