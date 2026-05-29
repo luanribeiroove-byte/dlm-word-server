@@ -598,6 +598,10 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     for prefixo in prefixos:
         bruto = mapa.get(f"{prefixo}_BRUTO")
         tratado = mapa.get(f"{prefixo}_TRATADO")
+        # LOG TEMPORÁRIO DE DIAGNÓSTICO (remover depois)
+        print(f"[DIAG linha {prefixo}] bruto={bruto!r} tratado={tratado!r} "
+              f"tem_numero_bruto={tem_numero(bruto)} tem_numero_tratado={tem_numero(tratado)}",
+              flush=True)
         if tem_numero(bruto) or tem_numero(tratado):
             continue  # tem ao menos um valor numérico → mantém a linha
 
