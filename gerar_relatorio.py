@@ -579,8 +579,18 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     (em branco ou "—"). Deve rodar ANTES de aplicar_substituicoes, enquanto
     os placeholders {{XXX_BRUTO}} ainda existem como âncora.
     """
-    def vazio(v):
-        return v is None or str(v).strip() in ("", "—", "-")
+    def tem_numero(v):
+        """True se o valor contém um número real (ignora >, <, espaços, vírgula decimal)."""
+        if v is None:
+            return False
+        s = str(v).strip()
+        if s in ("", "—", "-", "–", "N/D", "n/d", "N/A", "n/a"):
+            return False
+        # remove sinais de comparação e notação, troca vírgula por ponto
+        s = s.replace("<", "").replace(">", "").replace("±", "").strip()
+        s = s.replace(".", "").replace(",", ".")  # tolera 1.234,56 e 1,6E+7
+        import re as _re
+        return bool(_re.search(r"\d", s))
 
     # prefixo do placeholder de cada parâmetro da tabela
     prefixos = ["DBO", "DQO", "NTOTAL", "PTOTAL", "COLIFORMES", "PH", "TEMP"]
@@ -588,8 +598,8 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     for prefixo in prefixos:
         bruto = mapa.get(f"{prefixo}_BRUTO")
         tratado = mapa.get(f"{prefixo}_TRATADO")
-        if not (vazio(bruto) and vazio(tratado)):
-            continue  # tem ao menos um valor → mantém a linha
+        if tem_numero(bruto) or tem_numero(tratado):
+            continue  # tem ao menos um valor numérico → mantém a linha
 
         # acha a linha <w:tr> que contém o placeholder _BRUTO desse parâmetro
         marcador = "{{" + prefixo + "_BRUTO}}"
