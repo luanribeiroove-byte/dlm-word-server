@@ -33,6 +33,7 @@ from gerar_relatorio import (
     decidir_secoes_e_numerar, remover_secoes_ausentes, limpar_marcadores_secao,
     construir_mapa_dasa,
     aplicar_cores_celulas,
+    remover_linhas_parametros_vazios,
 )
 from secao4_builder import construir_secao4, construir_sumario_4x
 import zipfile
@@ -198,6 +199,10 @@ def gerar_relatorio():
                 xml = ajustar_linhas_nc(xml, num_ncs)
 
                 mapa = construir_mapa(dados)
+                # Remove linhas de parâmetros sem valor numérico (pH, Temp, etc.)
+                # Roda ANTES das substituições, enquanto os placeholders {{X_BRUTO}}
+                # ainda servem de âncora pra localizar a linha.
+                xml = remover_linhas_parametros_vazios(xml, mapa)
                 xml = aplicar_substituicoes(xml, mapa)
                 # OBS: coloração condicional das células de Prioridade (NCs)
                 # e Conformidade (Eficiência). Roda DEPOIS das substituições
