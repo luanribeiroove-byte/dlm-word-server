@@ -579,18 +579,31 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     (em branco ou "—"). Deve rodar ANTES de aplicar_substituicoes, enquanto
     os placeholders {{XXX_BRUTO}} ainda existem como âncora.
     """
-    def tem_numero(v):
-        """True se o valor contém um número real (ignora >, <, espaços, vírgula decimal)."""
+    def tem_valor_real(v):
+        """
+        True somente se o valor for um número de verdade e diferente de zero.
+        Qualquer outra coisa (vazio, traço, espaço, texto, 'N/D', '0') → False,
+        ou seja, a linha será removida.
+        """
         if v is None:
             return False
         s = str(v).strip()
-        if s in ("", "—", "-", "–", "N/D", "n/d", "N/A", "n/a"):
+        # casos explícitos de vazio
+        if s in ("", "—", "-", "–", "N/D", "n/d", "N/A", "n/a", "nd", "ND"):
             return False
-        # remove sinais de comparação e notação, troca vírgula por ponto
-        s = s.replace("<", "").replace(">", "").replace("±", "").strip()
-        s = s.replace(".", "").replace(",", ".")  # tolera 1.234,56 e 1,6E+7
-        import re as _re
-        return bool(_re.search(r"\d", s))
+        # limpa sinais de comparação/incerteza e normaliza separador decimal
+        s = s.replace("<", "").replace(">", "").replace("±", "").replace("≤", "").replace("≥", "").strip()
+        # remove separador de milhar e troca vírgula decimal por ponto
+        s2 = s.replace(".", "").replace(",", ".")
+        try:
+            num = float(s2)
+        except ValueError:
+            # não é número puro — mas pode ser notação científica tipo "1,6E+7"
+            import re as _re
+            if _re.search(r"\d\s*[eE]\s*[+\-]?\d", s):
+                return True   # notação científica = valor real
+            return False
+        return num != 0.0
 
     # prefixo do placeholder de cada parâmetro da tabela
     prefixos = ["DBO", "DQO", "NTOTAL", "PTOTAL", "COLIFORMES", "PH", "TEMP"]
@@ -598,12 +611,8 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     for prefixo in prefixos:
         bruto = mapa.get(f"{prefixo}_BRUTO")
         tratado = mapa.get(f"{prefixo}_TRATADO")
-        # LOG TEMPORÁRIO DE DIAGNÓSTICO (remover depois)
-        print(f"[DIAG linha {prefixo}] bruto={bruto!r} tratado={tratado!r} "
-              f"tem_numero_bruto={tem_numero(bruto)} tem_numero_tratado={tem_numero(tratado)}",
-              flush=True)
-        if tem_numero(bruto) or tem_numero(tratado):
-            continue  # tem ao menos um valor numérico → mantém a linha
+        if tem_valor_real(bruto) or tem_valor_real(tratado):
+            continue  # tem ao menos um valor numérico real → mantém a linha
 
         # acha a linha <w:tr> que contém o placeholder _BRUTO desse parâmetro
         marcador = "{{" + prefixo + "_BRUTO}}"
