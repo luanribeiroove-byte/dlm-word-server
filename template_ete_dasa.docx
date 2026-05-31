@@ -1,0 +1,138 @@
+**{{EMPRESA_NOME}}**  |  *Relatório de Operação e Manutenção - ETE **{{CLIENTE_NOME_CABECALHO}}*
+
+| **RELATÓRIO TÉCNICO DE OPERAÇÃO E MANUTENÇÃO** **ESTAÇÃO DE TRATAMENTO DE ESGOTO** **{{CLIENTE_NOME_UPPER}}** CNPJ: {{CLIENTE_CNPJ}} {{CLIENTE_ENDERECO}} **Período: ****{{PERIODO}}** Salvador, Bahia · {{DATA_EMISSAO}} |
+| --- |
+
+**SUMÁRIO**
+
+	**1. INTRODUÇÃO**	3
+
+	**2. DADOS DO EMPREENDIMENTO**	3
+
+	**3. QUADRO RESUMO DAS ATIVIDADES**	4
+
+	**4. DETALHAMENTO DAS ATIVIDADES**	4
+
+	**5. EFICIÊNCIA OPERACIONAL DA ETE**	7
+
+	**6. NÃO CONFORMIDADES E MEDIDAS MITIGADORAS**	8
+
+	**7. CONSIDERAÇÕES FINAIS**	9
+
+**1. INTRODUÇÃO**
+
+O presente relatório consolida as atividades de manutenção preventiva e corretiva executadas pela **{{EMPRESA_NOME}}** na Estação de Tratamento de Esgoto (ETE) do **{{CLIENTE_NOME}}**, localizado em {{CLIENTE_ENDERECO}}, inscrito sob o CNPJ {{CLIENTE_CNPJ}}.
+
+As intervenções descritas abrangem o período de **{{INTRO_PERIODO}}** e incluem {{INTRO_ATIVIDADES}}. O relatório apresenta, ainda, os resultados das análises laboratoriais realizadas pelo laboratório **{{LABORATORIO}}** nos meses de fevereiro e {{INTRO_PERIODO}}, com avaliação da eficiência de remoção de carga orgânica e conformidade com os padrões de lançamento da Resolução CONAMA nº 430/2011.
+
+A ETE opera sob o regime de {{TIPO_SISTEMA}}. A manutenção periódica dos equipamentos eletromecânicos e da infraestrutura hidráulica é condição indispensável para o atendimento dos padrões de lançamento previstos na Resolução CONAMA nº 430/2011, na Lei Estadual nº 10.431/2006 e no Decreto Estadual nº 14.024/2012.
+
+**2. DADOS DO EMPREENDIMENTO**
+
+| **Empreendimento** | {{CLIENTE_NOME}} |
+| --- | --- |
+| **CNPJ** | {{CLIENTE_CNPJ}} |
+| **Endereço** | {{CLIENTE_ENDERECO}} |
+| **Tipo de Sistema** | {{TIPO_SISTEMA}} |
+| **Responsável Técnico** | {{RT_NOME}} |
+| **Empresa Executora** | {{EMPRESA_NOME}} |
+| **Laboratório** | {{LABORATORIO}} |
+| **Período das Atividades** | {{PERIODO}} |
+
+**3. QUADRO RESUMO DAS ATIVIDADES**
+
+A tabela a seguir sintetiza as principais intervenções realizadas em cada competência. Os detalhes técnicos, registros fotográficos e medidas corretivas constam nas seções subsequentes.
+
+| **Mês/Ano** | **Atividades Realizadas** | **Classificação** |
+| --- | --- | --- |
+| **{{QUADRO1_MES_ANO}}** | {{QUADRO1_ATIVIDADE}} | {{QUADRO1_CLASSIFICACAO}} |
+
+**4. DETALHAMENTO DAS ATIVIDADES**
+
+{{__SECAO4_INICIO__}}
+Conteúdo dinâmico das inspeções será inserido aqui pelo gerador.
+{{__SECAO4_FIM__}}
+
+**5. EFICIÊNCIA OPERACIONAL DAS ETES**
+
+Em **{{INTRO_PERIODO}}** foram realizadas campanhas de monitoramento da qualidade do efluente nas duas estações de tratamento, com coleta de amostras na entrada (efluente bruto) e na saída (efluente tratado). As análises foram executadas pelo laboratório **{{LABORATORIO}}**, acreditado pela ABNT NBR ISO/IEC 17025, em conformidade com a Resolução CONAMA nº 430/2011, seguindo as metodologias do Standard Methods for the Examination of Water and Wastewater (SMWW).
+
+**5.1 ETE 01 — Entrada e Saída (Coleta em {{ETE1_DATA_COLETA}})**
+
+Amostragem realizada em **{{ETE1_DATA_COLETA}}**. Laudo nº **{{ETE1_LAUDO_BRUTO}}** (efluente bruto) e nº **{{ETE1_LAUDO_TRATADO}}** (efluente tratado). Elaboração dos laudos em {{ETE1_DATA_LAUDOS}}.
+
+| **Parâmetro** | **Entrada** | **Saída** | **Limite CONAMA 430/11** | **Situação** |
+| --- | --- | --- | --- | --- |
+| **pH** | {{ETE1_PH_ENTRADA}} | {{ETE1_PH_SAIDA}} | 5,0 a 9,0 | **{{ETE1_PH_SITUACAO}}** |
+| **Temperatura (°C)** | {{ETE1_TEMP_ENTRADA}} | {{ETE1_TEMP_SAIDA}} | < 40 °C | **{{ETE1_TEMP_SITUACAO}}** |
+| **Óleos e Graxas (mg/L)** | {{ETE1_OG_ENTRADA}} | {{ETE1_OG_SAIDA}} | Até 100¹ | **{{ETE1_OG_SITUACAO}}** |
+| **DBO (mg/L O₂)** | {{ETE1_DBO_ENTRADA}} | {{ETE1_DBO_SAIDA}} | Remoção mín. 60% | **{{ETE1_DBO_SITUACAO}}** |
+| **DQO (mg/L O₂)** | {{ETE1_DQO_ENTRADA}} | {{ETE1_DQO_SAIDA}} | Sem limite direto² | {{ETE1_DQO_SITUACAO}} |
+| **Nitrogênio Total (mg/L)** | {{ETE1_NTOTAL_ENTRADA}} | {{ETE1_NTOTAL_SAIDA}} | Sem limite direto² | {{ETE1_NTOTAL_SITUACAO}} |
+| **Nitrogênio Amoniacal (mg/L)** | {{ETE1_NAMONIACAL_ENTRADA}} | {{ETE1_NAMONIACAL_SAIDA}} | 20 mg/L N | **{{ETE1_NAMONIACAL_SITUACAO}}** |
+| **Fósforo Total (mg/L)** | {{ETE1_PTOTAL_ENTRADA}} | {{ETE1_PTOTAL_SAIDA}} | Sem limite direto² | {{ETE1_PTOTAL_SITUACAO}} |
+| **Sólidos Sedimentáveis (mL/L)** | {{ETE1_SSED_ENTRADA}} | {{ETE1_SSED_SAIDA}} | Até 1,0 | **{{ETE1_SSED_SITUACAO}}** |
+| **SST (mg/L)** | {{ETE1_SST_ENTRADA}} | {{ETE1_SST_SAIDA}} | Sem limite direto² | {{ETE1_SST_SITUACAO}} |
+| **Coliformes Termotol. (UFC/100 mL)** | {{ETE1_COLIF_ENTRADA}} | {{ETE1_COLIF_SAIDA}} | Parâm. operacional | **{{ETE1_COLIF_SITUACAO}}** |
+
+**¹ **Resolução CONAMA nº 430/2011, Art. 21: para sistemas de tratamento de esgoto sanitário, óleos e graxas (substâncias solúveis em hexano) até 100 mg/L.
+
+**² **Parâmetro sem limite numérico explícito na CONAMA 430/2011 para lançamento em corpos receptores; controlado operacionalmente como indicador de eficiência do tratamento.
+
+**Análise técnica — ETE 01: **{{ETE1_ANALISE_TECNICA}}
+
+**5.2 ETE 02 — Entrada e Saída (Coleta em {{ETE2_DATA_COLETA}}, Laudo em {{ETE2_MES_LAUDO}})**
+
+Amostragem realizada em **{{ETE2_DATA_COLETA}}**. Laudo nº **{{ETE2_LAUDO_BRUTO}}** (efluente bruto) e nº **{{ETE2_LAUDO_TRATADO}}** (efluente tratado). Elaboração dos laudos em {{ETE2_DATA_LAUDOS}}.
+
+| **Parâmetro** | **Entrada** | **Saída** | **Limite CONAMA 430/11** | **Situação** |
+| --- | --- | --- | --- | --- |
+| **pH** | {{ETE2_PH_ENTRADA}} | {{ETE2_PH_SAIDA}} | 5,0 a 9,0 | **{{ETE2_PH_SITUACAO}}** |
+| **Temperatura (°C)** | {{ETE2_TEMP_ENTRADA}} | {{ETE2_TEMP_SAIDA}} | < 40 °C | **{{ETE2_TEMP_SITUACAO}}** |
+| **Óleos e Graxas (mg/L)** | {{ETE2_OG_ENTRADA}} | {{ETE2_OG_SAIDA}} | Até 100¹ | **{{ETE2_OG_SITUACAO}}** |
+| **DBO (mg/L O₂)** | {{ETE2_DBO_ENTRADA}} | {{ETE2_DBO_SAIDA}} | Remoção mín. 60% | **{{ETE2_DBO_SITUACAO}}** |
+| **DQO (mg/L O₂)** | {{ETE2_DQO_ENTRADA}} | {{ETE2_DQO_SAIDA}} | Sem limite direto² | {{ETE2_DQO_SITUACAO}} |
+| **Nitrogênio Total (mg/L)** | {{ETE2_NTOTAL_ENTRADA}} | {{ETE2_NTOTAL_SAIDA}} | Sem limite direto² | {{ETE2_NTOTAL_SITUACAO}} |
+| **Nitrogênio Amoniacal (mg/L)** | {{ETE2_NAMONIACAL_ENTRADA}} | {{ETE2_NAMONIACAL_SAIDA}} | 20 mg/L N | **{{ETE2_NAMONIACAL_SITUACAO}}** |
+| **Fósforo Total (mg/L)** | {{ETE2_PTOTAL_ENTRADA}} | {{ETE2_PTOTAL_SAIDA}} | Sem limite direto² | {{ETE2_PTOTAL_SITUACAO}} |
+| **Sólidos Sedimentáveis (mL/L)** | {{ETE2_SSED_ENTRADA}} | {{ETE2_SSED_SAIDA}} | Até 1,0 | **{{ETE2_SSED_SITUACAO}}** |
+| **SST (mg/L)** | {{ETE2_SST_ENTRADA}} | {{ETE2_SST_SAIDA}} | Sem limite direto² | {{ETE2_SST_SITUACAO}} |
+| **Coliformes Termotol. (UFC/100 mL)** | {{ETE2_COLIF_ENTRADA}} | {{ETE2_COLIF_SAIDA}} | Parâm. operacional | **{{ETE2_COLIF_SITUACAO}}** |
+
+**¹ **Resolução CONAMA nº 430/2011, Art. 21: para sistemas de tratamento de esgoto sanitário, óleos e graxas (substâncias solúveis em hexano) até 100 mg/L.
+
+**² **Parâmetro sem limite numérico explícito na CONAMA 430/2011 para lançamento em corpos receptores; controlado operacionalmente como indicador de eficiência do tratamento.
+
+*** ****Observação técnica — Óleos e Graxas: **{{ETE2_OBSERVACAO_TECNICA}}
+
+**Análise técnica — ETE 02: **{{ETE2_ANALISE_TECNICA}}
+
+**6. NÃO CONFORMIDADES E MEDIDAS MITIGADORAS**
+
+As não conformidades e pendências operacionais identificadas no período estão consolidadas na tabela abaixo.
+
+| **Nº** | **Não Conformidade** | **Medida Mitigadora** | **Prioridade** | **Status** |
+| --- | --- | --- | --- | --- |
+| **01** | {{NC1_DESC}} | {{NC1_MEDIDA}} | **{{NC1_PRIORIDADE}}** | {{NC1_STATUS}} |
+| **02** | {{NC2_DESC}} | {{NC2_MEDIDA}} | **{{NC2_PRIORIDADE}}** | {{NC2_STATUS}} |
+| **03** | {{NC3_DESC}} | {{NC3_MEDIDA}} | **{{NC3_PRIORIDADE}}** | {{NC3_STATUS}} |
+
+**7. CONSIDERAÇÕES FINAIS**
+
+{{CONSID_P1}}
+
+{{CONSID_P2}}
+
+{{CONSID_P3}}
+
+{{CONSID_P4}}
+
+{{CONSID_P5}}
+
+ 
+
+**{{RT_NOME}}**
+
+{{EMPRESA_NOME_UPPER}}
+
+Página  de
