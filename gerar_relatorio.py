@@ -1025,11 +1025,10 @@ CORES_PLACEHOLDER = {
     "AAA107": "TEMP_CONFORMIDADE",
 }
 
-# Cores de FONTE (texto) — hex sem #. Coloração na fonte, não no fundo,
-# pra evitar o artefato de listra do <w:shd> no Word desktop.
-COR_VERMELHO = "E74C3C"   # vermelho vivo (Não Conforme / Urgente)
-COR_AMARELO  = "F39C12"   # laranja (Verificar / Alta)
-COR_VERDE    = "2ECC40"   # verde vivo (Conforme / Atende)
+# Cores de FONTE (texto) — hex sem #. Tons sóbrios/profissionais.
+COR_VERMELHO = "C0392B"   # vermelho sóbrio (Não Conforme / Urgente)
+COR_AMARELO  = "C77400"   # laranja queimado (Verificar / Alta)
+COR_VERDE    = "1D7A33"   # verde sóbrio (Conforme / Atende)
 COR_NEUTRA   = "000000"   # preto (texto normal, sem destaque)
 
 
