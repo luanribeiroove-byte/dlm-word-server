@@ -107,19 +107,19 @@ def _conformidade_temp(p: dict) -> str:
 
 def _conformidade_eficiencia(p: dict) -> str:
     """
-    Mostra a eficiência como texto para parâmetros sem limite direto CONAMA 430.
-    Ex: '99,3% remoção'. Se não conseguir calcular, retorna '—'.
+    Para parâmetros sem limite direto na CONAMA 430 (DQO, Nitrogênio, Fósforo,
+    Coliformes): mostra 'Atende' se a remoção for ≥ 60%, senão 'Verificar'.
+    A % em si já aparece na coluna Eficiência, então aqui não se repete o número.
+    Retorna '—' se não houver dado de eficiência.
     """
     if not p:
         return "—"
-    efic = p.get("eficiencia", "")
-    if efic and efic != "—":
-        # Garantir que tem "%" no final
-        efic_str = str(efic).strip()
-        if not efic_str.endswith("%"):
-            efic_str = efic_str + "%"
-        return f"{efic_str} remoção"
-    return "—"
+    efic = _to_float(p.get("eficiencia"))
+    if efic is None:
+        return "—"
+    if efic >= 60:
+        return "Atende *"
+    return "Verificar *"
 
 
 
@@ -901,6 +901,12 @@ def construir_mapa(dados: dict) -> dict:
         else:
             m["LISTA_PARAMETROS"] = "DBO, DQO, Nitrogênio Total, Fósforo Total e Coliformes Totais"
 
+        # Legenda explicativa da coluna Conformidade (abaixo da tabela)
+        m["LEGENDA_PARAMETROS"] = (
+            '* Sem limite na CONAMA 430/2011. Critério interno DLM: '
+            '"Atende" (remoção ≥ 60%) ou "Verificar" (< 60%).'
+        )
+
         # NOVO: metodologia SMWW só aparece se a IA capturou (campo opcional)
         if e.get("metodologia_smww"):
             m["METODOLOGIA_OPCIONAL"] = ", seguindo as metodologias do Standard Methods for the Examination of Water and Wastewater (SMWW)"
@@ -919,6 +925,12 @@ def construir_mapa(dados: dict) -> dict:
         m["NTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Nitrogênio Total", {}))
         m["PTOTAL_CONFORMIDADE"] = _conformidade_eficiencia(params_map.get("Fósforo Total", {}))
         m["COLIFORMES_CONFORMIDADE"] = _conformidade_eficiencia(colif)
+
+        # Legenda explicativa abaixo da tabela de parâmetros (asterisco)
+        m["LEGENDA_PARAMETROS"] = (
+            "* Sem limite na CONAMA 430/2011. "
+            "Critério: \u201cAtende\u201d (remoção \u2265 60%) ou \u201cVerificar\u201d (< 60%)."
+        )
 
         analises = e.get("analise_paragrafos", [])
         m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else ""
@@ -949,6 +961,7 @@ def construir_mapa(dados: dict) -> dict:
         m["PTOTAL_CONFORMIDADE"] = "—"
         m["COLIFORMES_CONFORMIDADE"] = "—"
         m["COLIFORMES_LABEL"] = "Coliformes Totais"
+        m["LEGENDA_PARAMETROS"] = ""
         m["ANALISE_EFIC_1"] = "Não foi realizada campanha de monitoramento neste período."
         m["ANALISE_EFIC_2"] = ""
         m["ANALISE_EFIC_3"] = ""
@@ -1027,10 +1040,11 @@ def _cor_prioridade(valor: str) -> str:
 
 def _cor_conformidade(valor: str) -> str:
     """Retorna a cor hex baseada no texto de conformidade.
-    
-    - 'CONFORME' (com ou sem %) → verde
+
+    - 'CONFORME' ou 'Atende' → verde
     - 'NÃO CONFORME' → vermelho
-    - qualquer outro (descritivo: '99% remoção', '—', etc) → sem cor
+    - 'Verificar' → amarelo (atenção)
+    - traço '—' ou vazio → sem cor
     """
     if not valor:
         return COR_NEUTRA
@@ -1040,6 +1054,10 @@ def _cor_conformidade(valor: str) -> str:
         return COR_VERMELHO
     if "conforme" in v:
         return COR_VERDE
+    if "atende" in v:
+        return COR_VERDE
+    if "verificar" in v:
+        return COR_AMARELO
     return COR_NEUTRA
 
 
