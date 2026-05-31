@@ -1025,11 +1025,12 @@ CORES_PLACEHOLDER = {
     "AAA107": "TEMP_CONFORMIDADE",
 }
 
-# Cores reais (hex sem #)
-COR_VERMELHO = "F8D7DA"   # vermelho claro pra fundo (Urgente, Não Conforme)
-COR_AMARELO  = "FFF3CD"   # amarelo claro (Alta prioridade)
-COR_VERDE    = "92D050"   # verde vivo saturado (Conforme/Atende)
-COR_NEUTRA   = "FFFFFF"   # branco (sem destaque)
+# Cores de FONTE (texto) — hex sem #. Coloração na fonte, não no fundo,
+# pra evitar o artefato de listra do <w:shd> no Word desktop.
+COR_VERMELHO = "E74C3C"   # vermelho vivo (Não Conforme / Urgente)
+COR_AMARELO  = "F39C12"   # laranja (Verificar / Alta)
+COR_VERDE    = "2ECC40"   # verde vivo (Conforme / Atende)
+COR_NEUTRA   = "000000"   # preto (texto normal, sem destaque)
 
 
 def _cor_prioridade(valor: str) -> str:
@@ -1067,23 +1068,50 @@ def _cor_conformidade(valor: str) -> str:
 
 def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
     """
-    Substitui as cores únicas (AAA001, AAA002, ...) pelas cores reais 
-    calculadas a partir dos valores em `mapa`.
-    
-    Deve ser chamado APÓS aplicar_substituicoes (que troca placeholders 
-    de texto) — assim sabemos os valores finais de prioridade/conformidade.
+    Colore a FONTE (texto) das células de conformidade/prioridade conforme
+    o valor. Usa o marcador de cor no <w:shd fill="AAA10X"/> só como ÂNCORA
+    pra localizar a célula; depois neutraliza o fundo (auto) e troca a cor
+    do texto (<w:color>) dentro daquela célula.
+
+    Colorir a fonte (em vez do fundo) evita o artefato de listra que o
+    <w:shd> de fundo gera no Word desktop.
+
+    Deve rodar APÓS aplicar_substituicoes.
     """
     for cor_unica, placeholder_logico in CORES_PLACEHOLDER.items():
+        marcador = f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_unica}"/>'
+        pos_marc = xml.find(marcador)
+        if pos_marc == -1:
+            continue
+
         valor = mapa.get(placeholder_logico, "")
         if "PRIORIDADE" in placeholder_logico:
             cor_real = _cor_prioridade(valor)
-        else:  # CONFORMIDADE
+        else:
             cor_real = _cor_conformidade(valor)
-        # Substituir a cor única pela cor real no shd
-        xml = xml.replace(
-            f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_unica}"/>',
-            f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_real}"/>'
+
+        # Limites da célula que contém o marcador
+        ini_tc = xml.rfind('<w:tc>', 0, pos_marc)
+        fim_tc = xml.find('</w:tc>', pos_marc)
+        if ini_tc == -1 or fim_tc == -1:
+            continue
+        fim_tc += len('</w:tc>')
+        celula = xml[ini_tc:fim_tc]
+
+        # 1) Neutraliza o fundo (remove a cor de âncora, deixa sem sombreamento)
+        celula_nova = celula.replace(marcador, '')
+
+        # 2) Troca a cor da fonte do texto dentro da célula
+        #    (substitui qualquer <w:color w:val="..."/> pela cor real)
+        import re as _re
+        celula_nova = _re.sub(
+            r'<w:color w:val="[0-9A-Fa-f]{6}"/>',
+            f'<w:color w:val="{cor_real}"/>',
+            celula_nova
         )
+
+        xml = xml[:ini_tc] + celula_nova + xml[fim_tc:]
+
     return xml
 
 
