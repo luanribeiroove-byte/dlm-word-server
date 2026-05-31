@@ -1067,49 +1067,85 @@ def _cor_conformidade(valor: str) -> str:
 
 def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
     """
-    Colore a FONTE (texto) das células de conformidade/prioridade conforme
-    o valor. Usa o marcador de cor no <w:shd fill="AAA10X"/> só como ÂNCORA
-    pra localizar a célula; depois neutraliza o fundo (auto) e troca a cor
-    do texto (<w:color>) dentro daquela célula.
+    Colore a FONTE (texto) das células de conformidade e de prioridade
+    conforme o valor. Usa marcadores de cor (<w:shd fill="AAA..."/>) como
+    âncora quando existem; para prioridade de NCs, percorre dinamicamente
+    todas as NCs do mapa (NC1, NC2, ... NCn), cobrindo qualquer quantidade.
 
-    Colorir a fonte (em vez do fundo) evita o artefato de listra que o
-    <w:shd> de fundo gera no Word desktop.
-
-    Deve rodar APÓS aplicar_substituicoes.
+    Colorir a fonte (em vez do fundo) evita o artefato de listra do <w:shd>
+    no Word desktop. Deve rodar APÓS aplicar_substituicoes.
     """
-    for cor_unica, placeholder_logico in CORES_PLACEHOLDER.items():
+    import re as _re
+
+    def _colore_celula_por_marcador(xml, cor_unica, cor_real):
         marcador = f'<w:shd w:val="clear" w:color="auto" w:fill="{cor_unica}"/>'
         pos_marc = xml.find(marcador)
         if pos_marc == -1:
-            continue
-
-        valor = mapa.get(placeholder_logico, "")
-        if "PRIORIDADE" in placeholder_logico:
-            cor_real = _cor_prioridade(valor)
-        else:
-            cor_real = _cor_conformidade(valor)
-
-        # Limites da célula que contém o marcador
+            return xml
         ini_tc = xml.rfind('<w:tc>', 0, pos_marc)
         fim_tc = xml.find('</w:tc>', pos_marc)
         if ini_tc == -1 or fim_tc == -1:
-            continue
+            return xml
+        fim_tc += len('</w:tc>')
+        celula = xml[ini_tc:fim_tc].replace(marcador, '')
+        celula = _re.sub(r'<w:color w:val="[0-9A-Fa-f]{6}"/>',
+                         f'<w:color w:val="{cor_real}"/>', celula)
+        return xml[:ini_tc] + celula + xml[fim_tc:]
+
+    def _colore_celula_por_texto(xml, texto, cor_real, desde=0):
+        # Acha a célula que contém esse texto (a partir de 'desde') e colore a fonte.
+        # Retorna (novo_xml, posicao_fim) pra busca sequencial sem repetir célula.
+        alvo = f'<w:t xml:space="preserve">{texto}</w:t>'
+        pos = xml.find(alvo, desde)
+        if pos == -1:
+            alvo = f'<w:t>{texto}</w:t>'
+            pos = xml.find(alvo, desde)
+        if pos == -1:
+            return xml, desde
+        ini_tc = xml.rfind('<w:tc>', 0, pos)
+        fim_tc = xml.find('</w:tc>', pos)
+        if ini_tc == -1 or fim_tc == -1:
+            return xml, desde
         fim_tc += len('</w:tc>')
         celula = xml[ini_tc:fim_tc]
+        celula = _re.sub(r'<w:color w:val="[0-9A-Fa-f]{6}"/>',
+                         f'<w:color w:val="{cor_real}"/>', celula)
+        novo_xml = xml[:ini_tc] + celula + xml[fim_tc:]
+        # nova posição de fim (o tamanho pode ter mudado levemente)
+        return novo_xml, ini_tc + len(celula)
 
-        # 1) Neutraliza o fundo (remove a cor de âncora, deixa sem sombreamento)
-        celula_nova = celula.replace(marcador, '')
+    # 1) Conformidade — via marcadores AAA10X (posição fixa no template)
+    for cor_unica, placeholder_logico in CORES_PLACEHOLDER.items():
+        if "PRIORIDADE" in placeholder_logico:
+            continue  # prioridade tratada dinamicamente abaixo
+        valor = mapa.get(placeholder_logico, "")
+        cor_real = _cor_conformidade(valor)
+        xml = _colore_celula_por_marcador(xml, cor_unica, cor_real)
 
-        # 2) Troca a cor da fonte do texto dentro da célula
-        #    (substitui qualquer <w:color w:val="..."/> pela cor real)
-        import re as _re
-        celula_nova = _re.sub(
-            r'<w:color w:val="[0-9A-Fa-f]{6}"/>',
-            f'<w:color w:val="{cor_real}"/>',
-            celula_nova
-        )
+    # 2) Prioridade das NCs — colore todas as ocorrências de cada valor,
+    #    cobrindo qualquer quantidade de NCs (NC1..NCn).
+    prioridades = []
+    i = 1
+    while f"NC{i}_PRIORIDADE" in mapa:
+        v = (mapa.get(f"NC{i}_PRIORIDADE") or "").strip()
+        if v:
+            prioridades.append(v)
+        i += 1
 
-        xml = xml[:ini_tc] + celula_nova + xml[fim_tc:]
+    # Para cada valor distinto que tem cor, colore todas as suas ocorrências
+    for valor in ("Urgente", "Alta", "urgente", "alta"):
+        cor_real = _cor_prioridade(valor)
+        if cor_real == COR_NEUTRA:
+            continue
+        if not any(p.lower() == valor.lower() for p in prioridades):
+            continue
+        desde = 0
+        while True:
+            xml_novo, nova_pos = _colore_celula_por_texto(xml, valor, cor_real, desde)
+            if nova_pos == desde:  # não achou mais
+                break
+            xml = xml_novo
+            desde = nova_pos
 
     return xml
 
