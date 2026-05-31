@@ -1028,7 +1028,7 @@ CORES_PLACEHOLDER = {
 # Cores reais (hex sem #)
 COR_VERMELHO = "F8D7DA"   # vermelho claro pra fundo (Urgente, Não Conforme)
 COR_AMARELO  = "FFF3CD"   # amarelo claro (Alta prioridade)
-COR_VERDE    = "D4EDDA"   # verde claro (Conforme)
+COR_VERDE    = "92D050"   # verde vivo saturado (Conforme/Atende)
 COR_NEUTRA   = "FFFFFF"   # branco (sem destaque)
 
 
