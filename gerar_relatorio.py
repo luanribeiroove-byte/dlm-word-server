@@ -856,8 +856,12 @@ def construir_mapa(dados: dict) -> dict:
         m["LAUDO_TRATADO"] = e.get("laudo_tratado", "—")
         m["DATA_LAUDOS"] = e.get("data_laudos", "—")
 
-        # NOVO: nome do laboratório (genérico, vem da extração da IA)
-        m["LABORATORIO"] = e.get("laboratorio", "[laboratório acreditado]")
+        # Hierarquia do laboratório: IA (extração) → cliente cadastrado → placeholder
+        m["LABORATORIO"] = (
+            e.get("laboratorio")
+            or cliente.get("laboratorio")
+            or "[laboratório acreditado]"
+        )
 
         params_map = {p["nome"]: p for p in e.get("parametros", [])}
 
