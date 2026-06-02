@@ -936,10 +936,53 @@ def construir_mapa(dados: dict) -> dict:
             "Critério: \u201cAtende\u201d (remoção \u2265 60%) ou \u201cVerificar\u201d (< 60%)."
         )
 
-        analises = e.get("analise_paragrafos", [])
-        m["ANALISE_EFIC_1"] = analises[0] if len(analises) > 0 else ""
-        m["ANALISE_EFIC_2"] = analises[1] if len(analises) > 1 else ""
-        m["ANALISE_EFIC_3"] = analises[2] if len(analises) > 2 else ""
+        # --- Texto de fechamento do item 6, montado a partir dos NÚMEROS reais ---
+        # (sem invenção: descreve só o que a tabela mostra)
+        dbo_p = params_map.get("DBO", {})
+        dbo_efic_val = _to_float(dbo_p.get("eficiencia"))
+        dbo_conf = m.get("DBO_CONFORMIDADE", "")
+
+        frases = []
+        # Frase 1 — DBO (único com limite federal claro na CONAMA 430)
+        if dbo_efic_val is not None:
+            efic_txt = f"{dbo_efic_val:.1f}".replace(".", ",") + "%"
+            if "CONFORME" in dbo_conf.upper():
+                frases.append(
+                    f"Os resultados demonstram remoção de {efic_txt} de DBO, "
+                    "atendendo ao padrão de lançamento estabelecido pela "
+                    "Resolução CONAMA nº 430/2011."
+                )
+            else:
+                frases.append(
+                    f"Os resultados demonstram remoção de {efic_txt} de DBO. "
+                    "Recomenda-se acompanhamento do parâmetro em relação ao "
+                    "padrão de lançamento estabelecido pela Resolução CONAMA nº 430/2011."
+                )
+
+        # Frase 2 — demais parâmetros (critério interno DLM)
+        outros = [n for n in ("DQO", "Nitrogênio Total", "Fósforo Total")
+                  if n in params_map]
+        if colif:
+            outros.append(m.get("COLIFORMES_LABEL", "Coliformes"))
+        if outros:
+            if len(outros) == 1:
+                lista_outros = outros[0]
+            else:
+                lista_outros = ", ".join(outros[:-1]) + " e " + outros[-1]
+            frases.append(
+                f"Para os demais parâmetros monitorados ({lista_outros}), a "
+                "Resolução CONAMA nº 430/2011 não estabelece limites específicos "
+                "de lançamento; sua avaliação seguiu o critério de eficiência de "
+                "remoção adotado pela DLM."
+            )
+
+        m["ANALISE_EFIC_1"] = " ".join(frases)
+        # Frase de referência aos laudos em anexo
+        m["ANALISE_EFIC_2"] = (
+            "Os laudos laboratoriais completos encontram-se no item "
+            "{{NUM_ANEXOS}} (Anexos) deste relatório."
+        )
+        m["ANALISE_EFIC_3"] = ""
         # Placeholder de limpeza (texto fixo do template que não usamos mais)
         m["__SECAO5_LIMPAR_1__"] = ""
     else:
