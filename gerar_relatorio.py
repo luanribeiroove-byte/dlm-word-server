@@ -851,7 +851,7 @@ def construir_mapa(dados: dict) -> dict:
     e = dados.get("eficiencia", {})
     if e.get("houve_campanha"):
         m["EFIC_MES"] = e.get("mes_campanha", "[A PREENCHER]")
-        m["DATA_AMOSTRAGEM"] = e.get("data_amostragem", "—")
+        m["DATA_AMOSTRAGEM"] = _formatar_data_br(e.get("data_amostragem", "—"))
         m["LAUDO_BRUTO"] = e.get("laudo_bruto", "—")
         m["LAUDO_TRATADO"] = e.get("laudo_tratado", "—")
         m["DATA_LAUDOS"] = e.get("data_laudos", "—")
@@ -1030,6 +1030,22 @@ COR_VERMELHO = "C0392B"   # vermelho sóbrio (Não Conforme / Urgente)
 COR_AMARELO  = "C77400"   # laranja queimado (Verificar / Alta)
 COR_VERDE    = "1D7A33"   # verde sóbrio (Conforme / Atende)
 COR_NEUTRA   = "000000"   # preto (texto normal, sem destaque)
+
+
+def _formatar_data_br(valor: str) -> str:
+    """Converte data de aaaa-mm-dd para dd/mm/aaaa.
+    Se não estiver nesse formato (vazio, traço, já em br, ou texto), devolve o valor original.
+    """
+    v = (valor or "").strip()
+    if not v:
+        return v
+    import re as _re
+    # Aceita aaaa-mm-dd (com - ou /) e converte
+    m = _re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$', v)
+    if m:
+        ano, mes, dia = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
+        return f"{dia}/{mes}/{ano}"
+    return v
 
 
 def _cor_prioridade(valor: str) -> str:
