@@ -1042,6 +1042,20 @@ def _cor_prioridade(valor: str) -> str:
     return COR_NEUTRA
 
 
+def _cor_status(valor: str) -> str:
+    """Retorna a cor hex baseada no status da NC.
+    Pendente → vermelho | Em andamento → amarelo | Resolvida → verde.
+    """
+    v = (valor or "").strip().lower()
+    if v == "pendente":
+        return COR_VERMELHO
+    if "andamento" in v:
+        return COR_AMARELO
+    if "resolvid" in v:  # resolvida / resolvido
+        return COR_VERDE
+    return COR_NEUTRA
+
+
 def _cor_conformidade(valor: str) -> str:
     """Retorna a cor hex baseada no texto de conformidade.
 
@@ -1122,8 +1136,7 @@ def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
         cor_real = _cor_conformidade(valor)
         xml = _colore_celula_por_marcador(xml, cor_unica, cor_real)
 
-    # 2) Prioridade das NCs — colore todas as ocorrências de cada valor,
-    #    cobrindo qualquer quantidade de NCs (NC1..NCn).
+    # 2) Prioridade das NCs — adiciona "(!)" ao Urgente e colore por valor.
     prioridades = []
     i = 1
     while f"NC{i}_PRIORIDADE" in mapa:
@@ -1132,8 +1145,18 @@ def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
             prioridades.append(v)
         i += 1
 
-    # Para cada valor distinto que tem cor, colore todas as suas ocorrências
-    for valor in ("Urgente", "Alta", "urgente", "alta"):
+    # 2a) Adiciona o marcador "(!) " antes de "Urgente" no texto das células.
+    #     Feito uma vez por ocorrência, e só se ainda não tiver o marcador.
+    if any(p.lower() == "urgente" for p in prioridades):
+        xml = xml.replace(
+            '<w:t xml:space="preserve">Urgente</w:t>',
+            '<w:t xml:space="preserve">(!) Urgente</w:t>'
+        )
+        xml = xml.replace('<w:t>Urgente</w:t>', '<w:t>(!) Urgente</w:t>')
+
+    # 2b) Colore as células de prioridade. Agora o texto pode ser "(!) Urgente".
+    for valor, alvo in (("Urgente", "(!) Urgente"), ("Alta", "Alta"),
+                        ("urgente", "(!) Urgente"), ("alta", "Alta")):
         cor_real = _cor_prioridade(valor)
         if cor_real == COR_NEUTRA:
             continue
@@ -1141,8 +1164,29 @@ def aplicar_cores_celulas(xml: str, mapa: dict) -> str:
             continue
         desde = 0
         while True:
+            xml_novo, nova_pos = _colore_celula_por_texto(xml, alvo, cor_real, desde)
+            if nova_pos == desde:
+                break
+            xml = xml_novo
+            desde = nova_pos
+
+    # 3) Status das NCs — colore por valor (Pendente/Em andamento/Resolvida).
+    status_vals = []
+    i = 1
+    while f"NC{i}_STATUS" in mapa:
+        v = (mapa.get(f"NC{i}_STATUS") or "").strip()
+        if v:
+            status_vals.append(v)
+        i += 1
+
+    for valor in set(status_vals):
+        cor_real = _cor_status(valor)
+        if cor_real == COR_NEUTRA:
+            continue
+        desde = 0
+        while True:
             xml_novo, nova_pos = _colore_celula_por_texto(xml, valor, cor_real, desde)
-            if nova_pos == desde:  # não achou mais
+            if nova_pos == desde:
                 break
             xml = xml_novo
             desde = nova_pos
