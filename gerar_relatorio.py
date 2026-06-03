@@ -979,8 +979,8 @@ def construir_mapa(dados: dict) -> dict:
         m["ANALISE_EFIC_1"] = " ".join(frases)
         # Frase de referência aos laudos em anexo
         m["ANALISE_EFIC_2"] = (
-            "Os laudos laboratoriais completos encontram-se no item "
-            "{{NUM_ANEXOS}} (Anexos) deste relatório."
+            "Os laudos laboratoriais completos encontram-se na última seção "
+            "deste relatório."
         )
         m["ANALISE_EFIC_3"] = ""
         # Placeholder de limpeza (texto fixo do template que não usamos mais)
