@@ -34,6 +34,7 @@ from gerar_relatorio import (
     construir_mapa_dasa,
     aplicar_cores_celulas,
     remover_linhas_parametros_vazios,
+    remover_paragrafos_vazios_efic,
 )
 from secao4_builder import construir_secao4, construir_sumario_4x
 import zipfile
@@ -202,6 +203,9 @@ def gerar_relatorio():
                 # Remove linhas de parâmetros sem valor (pH, Temp, etc.) ANTES
                 # de substituir, enquanto os placeholders {{X_BRUTO}} servem de âncora.
                 xml = remover_linhas_parametros_vazios(xml, mapa)
+                # Remove parágrafos vazios de ANALISE_EFIC (evita linha em branco
+                # extra entre o texto da eficiência e o título seguinte).
+                xml = remover_paragrafos_vazios_efic(xml, mapa)
                 xml = aplicar_substituicoes(xml, mapa)
                 # OBS: coloração condicional das células de Prioridade (NCs)
                 # e Conformidade (Eficiência). Roda DEPOIS das substituições

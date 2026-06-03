@@ -631,6 +631,35 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     return xml
 
 
+def remover_paragrafos_vazios_efic(xml: str, mapa: dict) -> str:
+    """
+    Remove o parágrafo inteiro dos placeholders {{ANALISE_EFIC_N}} que estejam
+    vazios no mapa. Sem isso, um placeholder vazio deixa uma linha em branco no
+    documento (ex.: espaço extra entre o texto da eficiência e o título seguinte).
+    Deve rodar ANTES de aplicar_substituicoes, enquanto os placeholders existem.
+    """
+    import re as _re
+    for n in ("1", "2", "3"):
+        chave = f"ANALISE_EFIC_{n}"
+        valor = mapa.get(chave, "")
+        if str(valor).strip():
+            continue  # tem texto → mantém o parágrafo
+        marcador = "{{" + chave + "}}"
+        pos = xml.find(marcador)
+        if pos == -1:
+            continue
+        # remove o parágrafo <w:p>...</w:p> que contém o placeholder
+        inicio = xml.rfind("<w:p>", 0, pos)
+        if inicio == -1:
+            inicio = xml.rfind("<w:p ", 0, pos)
+        fim = xml.find("</w:p>", pos)
+        if inicio == -1 or fim == -1:
+            continue
+        fim += len("</w:p>")
+        xml = xml[:inicio] + xml[fim:]
+    return xml
+
+
 def ajustar_linhas_quadro(xml: str, num_atividades: int) -> str:
     """
     Adiciona/remove linhas da tabela do Quadro Resumo conforme num_atividades.
