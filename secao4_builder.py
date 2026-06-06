@@ -477,3 +477,86 @@ def construir_sumario_4x(inspecoes: List[Dict[str, Any]]) -> str:
             '</w:p>'
         )
     return "".join(blocos)
+
+
+# ============================================================
+# ANEXO DO LAUDO (PDF → imagens inseridas no relatório)
+# ============================================================
+
+# Tamanho de cada página do laudo no documento (A4 útil, retrato)
+LAUDO_LARGURA_POL = 6.0   # largura da imagem da página do laudo
+LAUDO_ALTURA_POL = 9.2    # altura máxima (cabe numa página A4 com margens)
+
+
+def construir_anexo_laudo(
+    laudo_url: str,
+    pasta_assets: Path,
+    rids_disponiveis: List[str],
+) -> tuple:
+    """
+    Baixa o PDF do laudo a partir de laudo_url, converte cada página em imagem
+    (JPEG) e gera o XML para inserir todas as páginas no relatório, uma por
+    parágrafo centralizado.
+
+    Retorna (xml_paginas, lista_imagens_a_copiar), onde lista_imagens é
+    [(arquivo_origem, nome_destino, rid), ...] no mesmo formato que a Seção 4
+    usa — para o caller copiar pra media/ e criar os Relationships.
+
+    Se algo falhar (download, PyMuPDF ausente, PDF inválido), retorna ("", [])
+    para o relatório ser gerado sem o anexo (degradação graciosa).
+    """
+    if not laudo_url:
+        return "", []
+
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        print("⚠ PyMuPDF (fitz) não instalado — anexo do laudo ignorado")
+        return "", []
+
+    # 1) Baixar o PDF
+    pdf_path = pasta_assets / "laudo_baixado.pdf"
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(laudo_url, pdf_path)
+    except Exception as e:
+        print(f"⚠ Falha ao baixar laudo de {laudo_url}: {e}")
+        return "", []
+
+    # 2) Converter páginas em imagens JPEG
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        print(f"⚠ PDF do laudo inválido: {e}")
+        return "", []
+
+    blocos = []
+    imagens = []
+    mat = fitz.Matrix(1.5, 1.5)  # ~108 DPI, bom equilíbrio leitura/tamanho
+    img_id = 500  # ids únicos pra wp:docPr (longe dos da seção 4)
+
+    n_paginas = len(doc)
+    for i in range(n_paginas):
+        if i >= len(rids_disponiveis):
+            print(f"⚠ rIds insuficientes para o laudo (parou na página {i+1})")
+            break
+        rid = rids_disponiveis[i]
+        nome_destino = f"laudo_p{i+1}.jpg"
+        arquivo = pasta_assets / nome_destino
+        try:
+            pix = doc[i].get_pixmap(matrix=mat)
+            pix.save(arquivo, jpg_quality=80)
+        except Exception as e:
+            print(f"⚠ Falha ao converter página {i+1} do laudo: {e}")
+            continue
+
+        # Dimensões reais pra manter proporção
+        larg_px, alt_px = ler_dimensoes_px(arquivo)
+        cx, cy = calcular_emu(larg_px, alt_px, LAUDO_LARGURA_POL, LAUDO_ALTURA_POL)
+
+        blocos.append(p_imagem_centralizada(rid, cx, cy, f"Laudo página {i+1}", img_id))
+        img_id += 1
+        imagens.append((str(arquivo), nome_destino, rid))
+
+    doc.close()
+    return "".join(blocos), imagens
