@@ -421,11 +421,14 @@ def decidir_secoes_e_numerar(dados: dict) -> dict:
     eficiencia = dados.get("eficiencia", {}) or {}
     ncs = dados.get("nao_conformidades", []) or []
 
-    # ANEXOS = laudos da campanha. Se há campanha com laudo bruto OU tratado, há anexo.
+    # ANEXOS = laudos da campanha. Há anexo se:
+    #  - há laudo bruto OU tratado informado (texto), OU
+    #  - o usuário pediu pra anexar o PDF do laudo (anexar_laudo + laudo_url).
     houve_campanha = bool(eficiencia.get("houve_campanha"))
     laudo_bruto = (eficiencia.get("laudo_bruto") or "").strip()
     laudo_tratado = (eficiencia.get("laudo_tratado") or "").strip()
-    tem_anexos = houve_campanha and (bool(laudo_bruto) or bool(laudo_tratado))
+    anexar_laudo_pdf = bool(eficiencia.get("anexar_laudo")) and bool((eficiencia.get("laudo_url") or "").strip())
+    tem_anexos = houve_campanha and (bool(laudo_bruto) or bool(laudo_tratado) or anexar_laudo_pdf)
 
     presente = {
         "INTRODUCAO": True,
