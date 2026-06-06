@@ -36,7 +36,7 @@ from gerar_relatorio import (
     remover_linhas_parametros_vazios,
     remover_paragrafos_vazios_efic,
 )
-from secao4_builder import construir_secao4, construir_sumario_4x
+from secao4_builder import construir_secao4, construir_sumario_4x, construir_anexo_laudo
 import zipfile
 
 app = Flask(__name__)
@@ -183,6 +183,35 @@ def gerar_relatorio():
                     )
                     sumario_4x_xml = construir_sumario_4x(inspecoes)
 
+                # ===== Anexo do laudo (páginas do PDF como imagens) =====
+                # Roda ANTES de substituir_area_marcada da seção 4 para que os
+                # placeholders {{ANEXO_1}}/{{ANEXO_2}} ainda estejam no XML.
+                # Decisão: manter o texto dos boletins (ANEXO_1/ANEXO_2) e inserir
+                # as páginas do laudo logo APÓS o parágrafo de {{ANEXO_2}}.
+                eficiencia = dados.get("eficiencia", {}) or {}
+                laudo_url = eficiencia.get("laudo_url")
+                anexar_laudo = eficiencia.get("anexar_laudo")
+                anexo_imagens = []
+                if anexar_laudo and laudo_url:
+                    # rIds do laudo NÃO podem colidir com os da seção 4.
+                    # reservar_rids_para_fotos relê o .rels e calcula a partir do
+                    # maior rId, mas só persiste via adicionar_relationships_imagens
+                    # (no fim). Por isso reservamos um bloco maior e pulamos os
+                    # rIds já reservados pela seção 4.
+                    base = reservar_rids_para_fotos(unpacked, len(imagens_a_processar) + 60)
+                    rids_laudo = base[len(imagens_a_processar):]
+                    anexo_xml, anexo_imagens = construir_anexo_laudo(
+                        laudo_url, tmp, rids_laudo
+                    )
+                    if anexo_xml:
+                        # Insere as páginas logo após o parágrafo do {{ANEXO_2}}.
+                        pos_ph = xml.find("{{ANEXO_2}}")
+                        if pos_ph != -1:
+                            fim_par = xml.find("</w:p>", pos_ph)
+                            if fim_par != -1:
+                                fim_par += len("</w:p>")
+                                xml = xml[:fim_par] + anexo_xml + xml[fim_par:]
+
                 xml = substituir_area_marcada(xml, "__SUMARIO_4X_INICIO__", "__SUMARIO_4X_FIM__", sumario_4x_xml)
                 xml = substituir_area_marcada(xml, "__SECAO4_INICIO__", "__SECAO4_FIM__", secao4_xml)
 
@@ -220,9 +249,14 @@ def gerar_relatorio():
                         xml_aux = aplicar_substituicoes(xml_aux, mapa)
                         arq_path.write_text(xml_aux, encoding="utf-8")
 
-                if imagens_a_processar:
-                    copiar_fotos_para_media(unpacked, imagens_a_processar)
-                    adicionar_relationships_imagens(unpacked, imagens_a_processar)
+                # Junta imagens da seção 4 + páginas do laudo
+                todas_imagens = list(imagens_a_processar) + list(anexo_imagens)
+                if todas_imagens:
+                    copiar_fotos_para_media(unpacked, todas_imagens)
+                    # adicionar_relationships_imagens espera [(rid, nome), ...];
+                    # as listas vêm como (origem, nome_destino, rid).
+                    rels_map = [(rid, nome) for (_orig, nome, rid) in todas_imagens]
+                    adicionar_relationships_imagens(unpacked, rels_map)
 
             # Recompactar como .docx (comum aos dois fluxos)
             output_path = tmp / nome_arquivo
