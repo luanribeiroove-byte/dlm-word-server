@@ -634,6 +634,35 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
     return xml
 
 
+def remover_paragrafos_vazios_consid(xml: str, mapa: dict) -> str:
+    """
+    Remove o parágrafo inteiro dos placeholders {{CONSID_PN}} que estejam vazios
+    no mapa. O template tem vários parágrafos de considerações (CONSID_P1..P7);
+    quando o texto usa menos parágrafos, os restantes ficam vazios e deixam
+    linhas em branco — por exemplo, um vão grande entre o fim do tópico 7
+    (Considerações Finais) e o título da seção seguinte (Anexos).
+    Deve rodar ANTES de aplicar_substituicoes, enquanto os placeholders existem.
+    """
+    for n in range(1, 13):  # cobre CONSID_P1..P12 (template usa até P7)
+        chave = f"CONSID_P{n}"
+        valor = mapa.get(chave, "")
+        if str(valor).strip():
+            continue  # tem texto → mantém o parágrafo
+        marcador = "{{" + chave + "}}"
+        pos = xml.find(marcador)
+        if pos == -1:
+            continue
+        inicio = xml.rfind("<w:p>", 0, pos)
+        if inicio == -1:
+            inicio = xml.rfind("<w:p ", 0, pos)
+        fim = xml.find("</w:p>", pos)
+        if inicio == -1 or fim == -1:
+            continue
+        fim += len("</w:p>")
+        xml = xml[:inicio] + xml[fim:]
+    return xml
+
+
 def remover_paragrafos_vazios_efic(xml: str, mapa: dict) -> str:
     """
     Remove o parágrafo inteiro dos placeholders {{ANALISE_EFIC_N}} que estejam
