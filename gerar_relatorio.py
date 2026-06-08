@@ -636,18 +636,27 @@ def remover_linhas_parametros_vazios(xml: str, mapa: dict) -> str:
 
 def remover_paragrafos_vazios_consid(xml: str, mapa: dict) -> str:
     """
-    Remove o parágrafo inteiro dos placeholders {{CONSID_PN}} que estejam vazios
-    no mapa. O template tem vários parágrafos de considerações (CONSID_P1..P7);
-    quando o texto usa menos parágrafos, os restantes ficam vazios e deixam
-    linhas em branco — por exemplo, um vão grande entre o fim do tópico 7
-    (Considerações Finais) e o título da seção seguinte (Anexos).
-    Deve rodar ANTES de aplicar_substituicoes, enquanto os placeholders existem.
+    Remove os parágrafos dos placeholders {{CONSID_PN}} vazios, MAS preserva um
+    parágrafo vazio como respiro antes do título seguinte (Anexos), seguindo o
+    mesmo padrão dos outros tópicos do documento.
+
+    O template tem CONSID_P1..P7. Quando o texto usa menos parágrafos, os
+    restantes ficam vazios. Sem tratamento, todos viram linhas em branco (vão
+    grande). Removendo todos, o texto cola no próximo título (apertado demais).
+    Solução: remover os vazios EXCEDENTES e manter exatamente um como separador.
+    Deve rodar ANTES de aplicar_substituicoes.
     """
-    for n in range(1, 13):  # cobre CONSID_P1..P12 (template usa até P7)
+    # Descobre quais CONSID estão vazios, em ordem
+    vazios = []
+    for n in range(1, 13):
         chave = f"CONSID_P{n}"
-        valor = mapa.get(chave, "")
-        if str(valor).strip():
-            continue  # tem texto → mantém o parágrafo
+        if "{{" + chave + "}}" not in xml:
+            continue
+        if not str(mapa.get(chave, "")).strip():
+            vazios.append(chave)
+    # Mantém o ÚLTIMO vazio como respiro; remove os demais.
+    a_remover = vazios[:-1] if len(vazios) > 1 else []
+    for chave in a_remover:
         marcador = "{{" + chave + "}}"
         pos = xml.find(marcador)
         if pos == -1:
